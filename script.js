@@ -1712,17 +1712,19 @@ class GamingTextGenerator {
                     gradient = this.textCtx.createLinearGradient(x, currentY - fontSize/2, x, currentY + fontSize/2);
                     break;
                 case 'diagonal1':
-                    // 斜め方向（左上→右下）
+                    // 斜め方向（左上→右下）- より明確に45度斜めに
+                    const diagLength1 = Math.max(textWidth, fontSize);
                     gradient = this.textCtx.createLinearGradient(
-                        x - textWidth/2, currentY - fontSize/2,
-                        x + textWidth/2, currentY + fontSize/2
+                        x - diagLength1/2, currentY - diagLength1/2,
+                        x + diagLength1/2, currentY + diagLength1/2
                     );
                     break;
                 case 'diagonal2':
-                    // 斜め方向（右上→左下）
+                    // 斜め方向（右上→左下）- より明確に45度斜めに
+                    const diagLength2 = Math.max(textWidth, fontSize);
                     gradient = this.textCtx.createLinearGradient(
-                        x + textWidth/2, currentY - fontSize/2,
-                        x - textWidth/2, currentY + fontSize/2
+                        x + diagLength2/2, currentY - diagLength2/2,
+                        x - diagLength2/2, currentY + diagLength2/2
                     );
                     break;
                 default:
@@ -1893,17 +1895,19 @@ class GamingTextGenerator {
                     gradient = this.textCtx.createLinearGradient(x, currentY - fontSize/2, x, currentY + fontSize/2);
                     break;
                 case 'diagonal1':
-                    // 斜め方向（左上→右下）
+                    // 斜め方向（左上→右下）- より明確に45度斜めに
+                    const diagLength3 = Math.max(textWidth, fontSize);
                     gradient = this.textCtx.createLinearGradient(
-                        x - textWidth/2, currentY - fontSize/2,
-                        x + textWidth/2, currentY + fontSize/2
+                        x - diagLength3/2, currentY - diagLength3/2,
+                        x + diagLength3/2, currentY + diagLength3/2
                     );
                     break;
                 case 'diagonal2':
-                    // 斜め方向（右上→左下）
+                    // 斜め方向（右上→左下）- より明確に45度斜めに
+                    const diagLength4 = Math.max(textWidth, fontSize);
                     gradient = this.textCtx.createLinearGradient(
-                        x + textWidth/2, currentY - fontSize/2,
-                        x - textWidth/2, currentY + fontSize/2
+                        x + diagLength4/2, currentY - diagLength4/2,
+                        x - diagLength4/2, currentY + diagLength4/2
                     );
                     break;
                 default:
@@ -2124,12 +2128,20 @@ class GamingTextGenerator {
                         position = y / sourceCanvas.height; // 0-1の範囲
                         break;
                     case 'diagonal1':
-                        // 左上→右下
-                        position = (x / sourceCanvas.width + y / sourceCanvas.height) / 2; // 0-1の範囲
+                        // 左上→右下 - より明確に45度斜めに
+                        const maxDim1 = Math.max(sourceCanvas.width, sourceCanvas.height);
+                        const dx1 = x - sourceCanvas.width / 2;
+                        const dy1 = y - sourceCanvas.height / 2;
+                        const diagonalPos1 = (dx1 + dy1) / maxDim1 + 0.5; // 正規化
+                        position = Math.max(0, Math.min(1, diagonalPos1)); // 0-1の範囲に制限
                         break;
                     case 'diagonal2':
-                        // 右上→左下
-                        position = ((sourceCanvas.width - x) / sourceCanvas.width + y / sourceCanvas.height) / 2; // 0-1の範囲
+                        // 右上→左下 - より明確に45度斜めに
+                        const maxDim2 = Math.max(sourceCanvas.width, sourceCanvas.height);
+                        const dx2 = sourceCanvas.width / 2 - x;
+                        const dy2 = y - sourceCanvas.height / 2;
+                        const diagonalPos2 = (dx2 + dy2) / maxDim2 + 0.5; // 正規化
+                        position = Math.max(0, Math.min(1, diagonalPos2)); // 0-1の範囲に制限
                         break;
                     default:
                         position = x / sourceCanvas.width; // デフォルトは横方向
@@ -2378,12 +2390,20 @@ class GamingTextGenerator {
                         position = y / sourceCanvas.height; // 0-1の範囲
                         break;
                     case 'diagonal1':
-                        // 左上→右下
-                        position = (x / sourceCanvas.width + y / sourceCanvas.height) / 2; // 0-1の範囲
+                        // 左上→右下 - より明確に45度斜めに
+                        const maxDim3 = Math.max(sourceCanvas.width, sourceCanvas.height);
+                        const dx3 = x - sourceCanvas.width / 2;
+                        const dy3 = y - sourceCanvas.height / 2;
+                        const diagonalPos3 = (dx3 + dy3) / maxDim3 + 0.5; // 正規化
+                        position = Math.max(0, Math.min(1, diagonalPos3)); // 0-1の範囲に制限
                         break;
                     case 'diagonal2':
-                        // 右上→左下
-                        position = ((sourceCanvas.width - x) / sourceCanvas.width + y / sourceCanvas.height) / 2; // 0-1の範囲
+                        // 右上→左下 - より明確に45度斜めに
+                        const maxDim4 = Math.max(sourceCanvas.width, sourceCanvas.height);
+                        const dx4 = sourceCanvas.width / 2 - x;
+                        const dy4 = y - sourceCanvas.height / 2;
+                        const diagonalPos4 = (dx4 + dy4) / maxDim4 + 0.5; // 正規化
+                        position = Math.max(0, Math.min(1, diagonalPos4)); // 0-1の範囲に制限
                         break;
                     default:
                         position = x / sourceCanvas.width; // デフォルトは横方向
