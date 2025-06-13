@@ -295,8 +295,12 @@ class ConcentrationLineGenerator {
     }
 
     drawConcentrationLines(centerX, centerY, lineCount, lineWidth, colorMode, singleColor, centerSize, animationMode = 'static', timeOffset = 0) {
-        this.ctx.lineWidth = lineWidth;
+        // 最高品質レンダリング設定
+        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.imageSmoothingQuality = 'high';
         this.ctx.lineCap = 'butt'; // 線を尖った形に変更
+        this.ctx.lineJoin = 'round';
+        this.ctx.lineWidth = lineWidth;
         
         // キャンバスの対角線の長さを計算（線の長さの基準）
         const maxDistance = Math.sqrt(
@@ -402,6 +406,17 @@ class ConcentrationLineGenerator {
             if (animationMode === 'rainbow') {
                 // 虹色グラデーション：時間とともに色相が回転
                 hue = (hue + timeOffset * 180) % 360;
+            } else if (animationMode === 'bluepurplepink') {
+                // シアン→青→紫→ピンク→赤寄りグラデーション：180°（シアン）→340°（赤寄りピンク）
+                const colorCycle = (timeOffset * 2) % 1; // 0-1の範囲でループ
+                const hueRange = 160; // 180°から340°まで160°の範囲
+                const baseHue = 180; // シアンから開始
+                
+                // 滑らかな色相変化
+                let targetHue = baseHue + (hueRange * colorCycle);
+                if (targetHue >= 360) targetHue -= 360;
+                
+                hue = (targetHue + (360 * index) / totalLines) % 360; // 線ごとのオフセット
             } else if (animationMode === 'pulse') {
                 // ピカピカ点滅：明度が周期的に変化
                 const pulse = (Math.sin(timeOffset * Math.PI * 2 + index * 0.1) + 1) / 2;
@@ -578,20 +593,36 @@ class ConcentrationLineGenerator {
         this.downloadRealGifBtn.textContent = '生成中...';
         this.downloadRealGifBtn.disabled = true;
         try {
+            console.log('=== GIF生成開始 ===');
+            
+            // メモリ使用量をログ出力（可能な場合）
+            if (window.performance && window.performance.memory) {
+                const mem = window.performance.memory;
+                console.log(`メモリ使用量 - 使用中: ${(mem.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB, 制限: ${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(2)}MB`);
+            }
+            
             // フレームデータを収集
+            console.log('フレーム収集を開始...');
             await this.captureFramesForGif();
+            console.log(`フレーム収集完了: ${this.capturedFrames.length}フレーム`);
             
             const gifSize = this.getGifSize();
+            console.log(`GIFサイズ: ${gifSize.width}x${gifSize.height}`);
             
-            // gif.jsでGIF生成
+            // gif.jsでGIF生成（高品質設定）
+            console.log('GIFエンコーダーを初期化...');
             const gif = new GIF({
-                workers: 2,
-                quality: 10,
+                workers: 2, // 安定性を優先してワーカー数を2に
+                quality: 1, // 最高品質（1が最高、30が最低）
                 width: gifSize.width,
                 height: gifSize.height,
+                dither: false, // ディザリングを無効にして高品質に
+                globalPalette: false, // ローカルパレットで色精度向上
+                background: '#000000', // 背景色を明示的に指定
                 workerScript: 'gif.worker.js'
             });
             const frameCount = this.capturedFrames.length;
+            console.log(`GIFエンコーダー初期化完了, フレーム数: ${frameCount}`);
             
             // アニメーション速度に基づいてGIF再生速度を調整
             const animationSpeed = parseInt(this.animationSpeed.value) || 5;
@@ -599,11 +630,19 @@ class ConcentrationLineGenerator {
             const baseDelay = 2000 / frameCount; // 2秒ループをフレーム数で分割
             // アニメーション速度設定に応じて遅延時間を調整（速度が高いほど短い遅延）
             const adjustedDelay = Math.max(50, Math.round(baseDelay / (animationSpeed / 5)));
+            console.log(`フレーム遅延時間: ${adjustedDelay}ms`);
             
-            for (const frameCanvas of this.capturedFrames) {
+            console.log('フレームをGIFに追加中...');
+            for (let i = 0; i < this.capturedFrames.length; i++) {
+                const frameCanvas = this.capturedFrames[i];
+                console.log(`フレーム ${i + 1}/${frameCount} を追加中...`);
                 gif.addFrame(frameCanvas, {delay: adjustedDelay, copy: true});
             }
+            console.log('全フレーム追加完了');
             gif.on('finished', (blob) => {
+                console.log('GIF生成完了！', blob);
+                console.log(`生成されたGIFサイズ: ${(blob.size / 1024).toFixed(2)}KB`);
+                
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
@@ -614,17 +653,44 @@ class ConcentrationLineGenerator {
                 URL.revokeObjectURL(url);
                 this.downloadRealGifBtn.textContent = 'GIFで保存';
                 this.downloadRealGifBtn.disabled = false;
+                console.log('=== GIF生成処理完了 ===');
                 if (wasAnimating) {
                     this.startAnimation();
                 }
             });
+            
             gif.on('progress', (p) => {
-                this.downloadRealGifBtn.textContent = `GIF生成中... ${Math.round(p*100)}%`;
+                const progress = Math.round(p * 100);
+                console.log(`GIF生成進行: ${progress}%`);
+                this.downloadRealGifBtn.textContent = `GIF生成中... ${progress}%`;
             });
+            
+            gif.on('abort', () => {
+                console.error('GIF生成が中断されました');
+                this.downloadRealGifBtn.textContent = 'GIFで保存';
+                this.downloadRealGifBtn.disabled = false;
+            });
+            
+            console.log('GIF レンダリング開始...');
             gif.render();
         } catch (error) {
-            console.error('GIF生成エラー詳細:', error);
-            alert('GIF生成に失敗しました。');
+            console.error('=== GIF生成エラー詳細 ===');
+            console.error('エラーメッセージ:', error.message);
+            console.error('エラースタック:', error.stack);
+            console.error('エラーオブジェクト:', error);
+            
+            // エラーの種類に応じて詳細な情報を出力
+            if (error.name === 'QuotaExceededError' || error.message.includes('memory')) {
+                console.error('メモリ不足エラーの可能性があります');
+                alert('GIF生成に失敗しました。\nメモリ不足の可能性があります。\n・GIFサイズを小さくしてみてください\n・フレーム数を減らしてみてください');
+            } else if (error.message.includes('worker') || error.message.includes('Worker')) {
+                console.error('ワーカースクリプトの読み込みエラーの可能性があります');
+                alert('GIF生成に失敗しました。\nワーカースクリプトの読み込みエラーです。\nページを再読み込みしてください。');
+            } else {
+                console.error('不明なエラーです');
+                alert(`GIF生成に失敗しました。\nエラー: ${error.message}\n\nコンソールログで詳細を確認してください。`);
+            }
+            
             this.downloadRealGifBtn.textContent = 'GIFで保存';
             this.downloadRealGifBtn.disabled = false;
             if (wasAnimating) {
@@ -636,16 +702,17 @@ class ConcentrationLineGenerator {
     getGifSize() {
         const mode = this.gifSizeMode.value;
         if (mode === 'small') {
-            return { width: 128, height: 128 };
+            return { width: 512, height: 512 }; // 小サイズを512x512に改善
         } else if (mode === 'original') {
             return { width: this.canvas.width, height: this.canvas.height };
         } else if (mode === 'custom') {
             return { 
-                width: parseInt(this.gifWidth.value) || 256, 
-                height: parseInt(this.gifHeight.value) || 256 
+                width: parseInt(this.gifWidth.value) || 768, 
+                height: parseInt(this.gifHeight.value) || 768 
             };
         }
-        return { width: 128, height: 128 };
+        // デフォルトは元画像サイズを使用（高解像度）
+        return { width: this.canvas.width, height: this.canvas.height };
     }
 
     // 完璧なループのための最適フレーム数を自動計算
@@ -661,6 +728,12 @@ class ConcentrationLineGenerator {
                 // 速度に応じて調整（速い場合は少ないフレーム、遅い場合は多いフレーム）
                 const baseRainbowFrames = 14; // 7色 × 2倍の滑らかさ
                 optimalFrames = Math.max(8, Math.round(baseRainbowFrames * (10 / animationSpeed)));
+                break;
+                
+            case 'bluepurplepink':
+                // シアン→青→紫→ピンク→赤寄りグラデーション：7色のグラデーション一周期
+                const baseBluePurplePinkFrames = 14; // 7色 × 2倍の滑らかさ（虹色と同等）
+                optimalFrames = Math.max(8, Math.round(baseBluePurplePinkFrames * (10 / animationSpeed)));
                 break;
                 
             case 'pulse':
@@ -707,11 +780,19 @@ class ConcentrationLineGenerator {
                             this.startTime = baseTime;
                             this.generateConcentrationLines(frameTime);
                             
-                            // 指定サイズでキャプチャ
+                            // 指定サイズでキャプチャ（高品質レンダリング）
                             const tempCanvas = document.createElement('canvas');
                             tempCanvas.width = gifSize.width;
                             tempCanvas.height = gifSize.height;
                             const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+                            
+                            // 最高品質レンダリング設定
+                            tempCtx.imageSmoothingEnabled = true;
+                            tempCtx.imageSmoothingQuality = 'high';
+                            tempCtx.lineCap = 'round';
+                            tempCtx.lineJoin = 'round';
+                            tempCtx.textRenderingOptimization = 'optimizeQuality';
+                            
                             tempCtx.drawImage(this.canvas, 0, 0, tempCanvas.width, tempCanvas.height);
                             
                             this.capturedFrames.push(tempCanvas);
@@ -1040,10 +1121,20 @@ class GamingTextGenerator {
         const width = parseInt(this.textCanvasWidth.value) || 64;
         const height = parseInt(this.textCanvasHeight.value) || 64;
         
+        // 通常のキャンバスサイズ設定
         this.textCanvas.width = width;
         this.textCanvas.height = height;
         this.textCanvas.style.width = width + 'px';
         this.textCanvas.style.height = height + 'px';
+        
+        // 高品質レンダリング設定
+        this.textCtx.imageSmoothingEnabled = true;
+        this.textCtx.imageSmoothingQuality = 'high';
+        this.textCtx.lineCap = 'round';
+        this.textCtx.lineJoin = 'round';
+        if (this.textCtx.textRenderingOptimization) {
+            this.textCtx.textRenderingOptimization = 'optimizeQuality';
+        }
         
         // キャンバスを完全に透明にクリア
         this.textCtx.clearRect(0, 0, width, height);
@@ -1105,13 +1196,13 @@ class GamingTextGenerator {
 
     handleAnimationModeChange() {
         // グラデーション方向の選択UIの表示/非表示を制御
-        if (this.textAnimationMode.value === 'rainbow') {
+        if (this.textAnimationMode.value === 'rainbow' || this.textAnimationMode.value === 'bluepurplepink') {
             this.gradientDirectionGroup.style.display = 'block';
         } else {
             this.gradientDirectionGroup.style.display = 'none';
         }
         
-        if (this.textAnimationMode.value === 'rainbow' || this.textAnimationMode.value === 'pulse' || this.textAnimationMode.value === 'rainbowPulse') {
+        if (this.textAnimationMode.value === 'rainbow' || this.textAnimationMode.value === 'bluepurplepink' || this.textAnimationMode.value === 'pulse' || this.textAnimationMode.value === 'rainbowPulse') {
             this.startAnimation();
         } else {
             this.stopAnimation();
@@ -1149,6 +1240,12 @@ class GamingTextGenerator {
         const animationSpeed = parseInt(this.textAnimationSpeed.value);
         const isTransparent = this.textTransparentBg.checked;
         
+        console.log('=== generateText デバッグ ===');
+        console.log('text:', text);
+        console.log('canvas size:', this.textCanvas.width, 'x', this.textCanvas.height);
+        console.log('animationMode:', animationMode);
+        console.log('isTransparent:', isTransparent);
+        
         // キャンバスをクリア（完全に透明にリセット）
         this.textCtx.clearRect(0, 0, this.textCanvas.width, this.textCanvas.height);
         
@@ -1156,16 +1253,28 @@ class GamingTextGenerator {
         if (!isTransparent) {
             this.textCtx.fillStyle = '#000000';
             this.textCtx.fillRect(0, 0, this.textCanvas.width, this.textCanvas.height);
+            console.log('黒背景を描画しました');
         }
         
         // テキストサイズを取得（スライダーの値を使用）
         const fontSize = parseInt(this.textSize.value);
+        console.log('fontSize:', fontSize);
         
         // フォント設定（選択されたフォントを使用）
         const selectedFont = this.textFont ? this.textFont.value : 'Arial';
         this.textCtx.font = `bold ${fontSize}px ${selectedFont}`;
         this.textCtx.textAlign = 'center';
         this.textCtx.textBaseline = 'middle';
+        console.log('font設定:', this.textCtx.font);
+        
+        // 最高品質レンダリング設定（プレビュー用）
+        this.textCtx.imageSmoothingEnabled = true;
+        this.textCtx.imageSmoothingQuality = 'high';
+        this.textCtx.lineCap = 'round';
+        this.textCtx.lineJoin = 'round';
+        if (this.textCtx.textRenderingOptimization) {
+            this.textCtx.textRenderingOptimization = 'optimizeQuality';
+        }
         
         // アニメーション時間オフセットを計算（非線形速度）
         let timeOffset = 0;
@@ -1182,7 +1291,12 @@ class GamingTextGenerator {
             this.drawGamingImage(this.uploadedImage, animationMode, timeOffset);
         } else {
             const isStretch = this.textStretch.checked;
-            this.drawGamingText(text, this.textCanvas.width / 2, this.textCanvas.height / 2, animationMode, timeOffset, fontSize, isStretch);
+            const centerX = this.textCanvas.width / 2;
+            const centerY = this.textCanvas.height / 2;
+            console.log('drawGamingText呼び出し:', {
+                text, centerX, centerY, animationMode, timeOffset, fontSize, isStretch
+            });
+            this.drawGamingText(text, centerX, centerY, animationMode, timeOffset, fontSize, isStretch);
         }
         
         // ダウンロードボタンを有効化
@@ -1195,16 +1309,21 @@ class GamingTextGenerator {
     }
 
     drawGamingText(text, x, y, animationMode, timeOffset, fontSize, isStretch = false) {
+        console.log('=== drawGamingText 開始 ===');
+        console.log('引数:', { text, x, y, animationMode, timeOffset, fontSize, isStretch });
+        
         // 改行対応
         const lines = text.split('\n');
         let lineHeight = fontSize * 1.2;
         let actualFontSize = fontSize;
+        console.log('lines:', lines, 'lineHeight:', lineHeight, 'actualFontSize:', actualFontSize);
+        
+        // キャンバスサイズを事前に取得（スコープ問題を回避）
+        const canvasHeight = this.textCanvas.height;
+        const canvasWidth = this.textCanvas.width;
         
         // テキスト引き伸ばしが有効な場合
         if (isStretch) {
-            const canvasHeight = this.textCanvas.height;
-            const canvasWidth = this.textCanvas.width;
-            
             if (lines.length === 1) {
                 // 単一行：キャンバス高さの95%をフォントサイズに使用（最大限フィット）
                 actualFontSize = canvasHeight * 0.95;
@@ -1218,8 +1337,25 @@ class GamingTextGenerator {
         }
         
         // フォント設定を更新（選択されたフォントを使用）
-        const selectedFont = this.textFont ? this.textFont.value : 'Arial';
+        let selectedFont = this.textFont ? this.textFont.value : 'Arial';
+        
+        // 小さいサイズでの最適フォント選択
+        const canvasSize = Math.min(canvasWidth, canvasHeight);
+        if (canvasSize <= 64 && actualFontSize <= 20) {
+            // 64x64以下かつ小フォントの場合、より鮮明なフォントに最適化
+            const originalFont = selectedFont;
+            if (selectedFont.includes('Gothic') || selectedFont.includes('gothic')) {
+                selectedFont = '"Hiragino Sans", "Yu Gothic UI", "Yu Gothic", YuGothic, "Meiryo UI", Meiryo, sans-serif';
+            } else if (selectedFont === 'Arial' || selectedFont.includes('sans-serif')) {
+                selectedFont = '"Segoe UI", "Helvetica Neue", Arial, sans-serif';
+            } else if (selectedFont.includes('serif')) {
+                selectedFont = '"Times New Roman", Times, serif';
+            }
+            console.log(`小サイズ用フォント最適化: ${originalFont} → ${selectedFont}`);
+        }
+        
         this.textCtx.font = `bold ${actualFontSize}px ${selectedFont}`;
+        
         // テキストベースラインを正確に設定（ぴったりフィット用）
         if (isStretch) {
             this.textCtx.textBaseline = 'alphabetic'; // 引き伸ばし時はより正確な基準線を使用
@@ -1228,9 +1364,23 @@ class GamingTextGenerator {
         }
         this.textCtx.textAlign = 'center';
         
+        // 小さいサイズでの追加最適化
+        if (canvasSize <= 64) {
+            // より精密な描画設定
+            this.textCtx.fontKerning = 'auto';
+            this.textCtx.fontVariantCaps = 'normal';
+            this.textCtx.fontStretch = 'normal';
+            this.textCtx.fontDisplay = 'block';
+            console.log(`小サイズ用描画設定適用: ${canvasSize}px`);
+        }
+        
         lines.forEach((line, index) => {
+            console.log(`行 ${index}: "${line}"`);
             // 空白行をスキップしない（スペースのみの行も描画対象）
-            if (!line && line !== '') return;
+            if (!line && line !== '') {
+                console.log('空行のためスキップ');
+                return;
+            }
             
             let currentY;
             
@@ -1253,14 +1403,14 @@ class GamingTextGenerator {
             
             // テキスト引き伸ばしが有効な場合、各行を個別に横幅いっぱいに調整
             if (isStretch && line.trim()) {
-                const canvasWidth = this.textCanvas.width;
+                const stretchCanvasWidth = this.textCanvas.width;
                 
                 // 現在のフォントサイズでテキスト幅を測定
                 const currentWidth = this.textCtx.measureText(line).width;
                 
                 if (currentWidth > 0) {
                     // 横方向のスケール比を計算（キャンバス幅の99%に収める - ぴったりフィット）
-                    const targetWidth = canvasWidth * 0.99; // 最小限のマージンでぴったりフィット
+                    const targetWidth = stretchCanvasWidth * 0.99; // 最小限のマージンでぴったりフィット
                     const scaleX = targetWidth / currentWidth;
                     
                     // 変形を適用
@@ -1268,7 +1418,7 @@ class GamingTextGenerator {
                     this.textCtx.scale(scaleX, 1);
                     
                     // スケールされた座標で描画（中央揃えを維持）
-                    const scaledX = (canvasWidth / 2) / scaleX; // 中央位置をスケールで調整
+                    const scaledX = (stretchCanvasWidth / 2) / scaleX; // 中央位置をスケールで調整
                     
                     // アニメーション効果を引き伸ばし後に適用
                     this.applyAnimationEffect(animationMode, timeOffset, line, scaledX, currentY);
@@ -1280,7 +1430,8 @@ class GamingTextGenerator {
                 }
             } else {
                 // 通常の描画（引き伸ばしでない場合、または空白行）
-            this.applyAnimationEffect(animationMode, timeOffset, line, x, currentY);
+                console.log('通常描画:', { line, x, currentY, animationMode });
+                this.applyAnimationEffect(animationMode, timeOffset, line, x, currentY);
             }
         });
         
@@ -1512,6 +1663,13 @@ class GamingTextGenerator {
                 gamingColors = gamingColors.map(color => this.adjustColorSaturation(color, saturationLevel));
             }
             
+            // 小さいサイズでの色強化適用
+            const smallCanvasSize = Math.min(this.textCanvas.width, this.textCanvas.height);
+            if (smallCanvasSize <= 64) {
+                gamingColors = gamingColors.map(color => this.enhanceColorForSmallSize(color));
+                console.log(`小サイズ用虹色強化適用: ${smallCanvasSize}px`);
+            }
+            
             // グラデーション方向に応じてグラデーションを作成
             const textWidth = this.textCtx.measureText(line).width;
             const fontSize = parseInt(this.textCtx.font.match(/\d+/)[0]) || 32; // フォントサイズを取得
@@ -1546,8 +1704,9 @@ class GamingTextGenerator {
                     gradient = this.textCtx.createLinearGradient(x - textWidth/2, currentY, x + textWidth/2, currentY);
             }
             
-            // 時間ベースの色変化を修正（より滑らかな変化）
-            const colorShift = Math.abs(timeOffset * 2) % gamingColors.length; // 配列範囲内に制限
+            // 時間ベースの色変化を修正（完璧なループのため）
+            const normalizedTime = (timeOffset % 1 + 1) % 1; // 0-1の範囲で正規化
+            const colorShift = normalizedTime * gamingColors.length; // 0-配列長の範囲
             
             for (let i = 0; i <= 10; i++) {
                 // 各グラデーション位置での色インデックスを計算
@@ -1645,6 +1804,13 @@ class GamingTextGenerator {
                 gamingColors = gamingColors.map(color => this.adjustColorSaturation(color, saturationLevel));
             }
             
+            // 小さいサイズでの色強化適用
+            const smallCanvasSize2 = Math.min(this.textCanvas.width, this.textCanvas.height);
+            if (smallCanvasSize2 <= 64) {
+                gamingColors = gamingColors.map(color => this.enhanceColorForSmallSize(color));
+                console.log(`小サイズ用虹色パルス強化適用: ${smallCanvasSize2}px`);
+            }
+            
             // 時間に基づいて色を順番に選択（アニメーションで色が変化）
             const colorCycleSpeed = 2.0; // 色の変化速度
             const colorIndex = Math.floor(Math.abs(timeOffset * colorCycleSpeed)) % gamingColors.length;
@@ -1681,11 +1847,172 @@ class GamingTextGenerator {
                 this.textCtx.shadowColor = 'transparent';
                 this.textCtx.shadowBlur = 0;
             }
+
+        } else if (animationMode === 'bluepurplepink') {
+            // シアン→青→紫→ピンク→赤寄りグラデーション
+            let gamingColors = [
+                '#00FFFF', // シアン
+                '#0080FF', // 青
+                '#4040FF', // 青紫
+                '#8000FF', // 紫
+                '#C040FF', // ピンク紫
+                '#FF40C0', // ピンク
+                '#FF6080'  // 赤寄りピンク
+            ];
+            
+            // 彩度に応じて色を調整
+            if (saturationLevel !== 1.0) {
+                gamingColors = gamingColors.map(color => this.adjustColorSaturation(color, saturationLevel));
+            }
+            
+            // 小さいサイズでの色強化適用
+            const smallCanvasSize3 = Math.min(this.textCanvas.width, this.textCanvas.height);
+            if (smallCanvasSize3 <= 64) {
+                gamingColors = gamingColors.map(color => this.enhanceColorForSmallSize(color));
+                console.log(`小サイズ用青紫ピンク強化適用: ${smallCanvasSize3}px`);
+            }
+            
+            // グラデーション方向に応じてグラデーションを作成
+            const textWidth = this.textCtx.measureText(line).width;
+            const fontSize = parseInt(this.textCtx.font.match(/\d+/)[0]) || 32; // フォントサイズを取得
+            const direction = this.textGradientDirection ? this.textGradientDirection.value : 'horizontal';
+            let gradient;
+            
+            switch (direction) {
+                case 'horizontal':
+                    // 横方向（左→右）
+                    gradient = this.textCtx.createLinearGradient(x - textWidth/2, currentY, x + textWidth/2, currentY);
+                    break;
+                case 'vertical':
+                    // 縦方向（上→下）
+                    gradient = this.textCtx.createLinearGradient(x, currentY - fontSize/2, x, currentY + fontSize/2);
+                    break;
+                case 'diagonal1':
+                    // 斜め方向（左上→右下）
+                    gradient = this.textCtx.createLinearGradient(
+                        x - textWidth/2, currentY - fontSize/2,
+                        x + textWidth/2, currentY + fontSize/2
+                    );
+                    break;
+                case 'diagonal2':
+                    // 斜め方向（右上→左下）
+                    gradient = this.textCtx.createLinearGradient(
+                        x + textWidth/2, currentY - fontSize/2,
+                        x - textWidth/2, currentY + fontSize/2
+                    );
+                    break;
+                default:
+                    // デフォルトは横方向
+                    gradient = this.textCtx.createLinearGradient(x - textWidth/2, currentY, x + textWidth/2, currentY);
+            }
+            
+            // 時間ベースの色変化を修正（完璧なループのため）
+            const normalizedTime = (timeOffset % 1 + 1) % 1; // 0-1の範囲で正規化
+            const colorShift = normalizedTime * gamingColors.length; // 0-配列長の範囲
+            
+            for (let i = 0; i <= 10; i++) {
+                // 各グラデーション位置での色インデックスを計算
+                const position = i / 10; // 0-1の範囲
+                const colorFloat = (position * gamingColors.length + colorShift) % gamingColors.length;
+                
+                // 安全なインデックス計算
+                const colorIndex = Math.floor(Math.abs(colorFloat)) % gamingColors.length;
+                const nextColorIndex = (colorIndex + 1) % gamingColors.length;
+                const blend = Math.max(0, Math.min(1, colorFloat - Math.floor(colorFloat))); // 0-1の範囲に確実に制限
+                
+                // 2つの色をブレンド（彩度を保持）
+                const color1 = gamingColors[colorIndex];
+                const color2 = gamingColors[nextColorIndex];
+                
+                // 安全性チェック付きでブレンド
+                let blendedColor;
+                if (color1 && color2) {
+                try {
+                    blendedColor = this.blendColorsVivid(color1, color2, blend);
+                } catch (error) {
+                    console.error('Vivid blend error, falling back to normal blend:', error);
+                    blendedColor = this.blendColors(color1, color2, blend);
+                    }
+                } else {
+                    // フォールバック色
+                    blendedColor = color1 || color2 || '#FF0000';
+                }
+                
+                gradient.addColorStop(position, blendedColor);
+            }
+            
+            this.textCtx.fillStyle = gradient;
+            this.textCtx.strokeStyle = gradient;
+            this.textCtx.lineWidth = 2;
+            
+            // 発光効果（グロー設定に応じて）
+            if (this.textGlow.checked) {
+                const currentColorIndex = Math.floor(Math.abs(colorShift)) % gamingColors.length;
+                this.textCtx.shadowColor = gamingColors[currentColorIndex];
+                this.textCtx.shadowBlur = 15;
+            } else {
+                this.textCtx.shadowColor = 'transparent';
+                this.textCtx.shadowBlur = 0;
+            }
         }
         
         // テキストを描画
+        console.log('テキスト描画実行:', {
+            line, x: x, y: currentY, 
+            fillStyle: this.textCtx.fillStyle,
+            font: this.textCtx.font
+        });
+        
+        // 高品質テキスト描画設定
+        this.textCtx.imageSmoothingEnabled = true;
+        this.textCtx.imageSmoothingQuality = 'high';
+        
+        // 小さいフォントサイズの場合の特別な品質向上
+        const fontSize = parseInt(this.textCtx.font.match(/\d+/)[0]) || 32;
+        const canvasSize = Math.min(this.textCanvas.width, this.textCanvas.height);
+        
+        if (fontSize <= 24 || canvasSize <= 64) {
+            // 小さいフォント/小さいキャンバスでは高品質レンダリング最適化
+            this.textCtx.textRenderingOptimization = 'optimizeQuality';
+            this.textCtx.fontKerning = 'normal';
+            this.textCtx.fontVariantCaps = 'normal';
+            
+            // 小さいサイズ専用：線幅を細くして精細に
+            const originalLineWidth = this.textCtx.lineWidth;
+            if (this.textCtx.lineWidth > 1) {
+                if (canvasSize <= 32) {
+                    this.textCtx.lineWidth = Math.max(0.3, this.textCtx.lineWidth * 0.5); // 32px以下はさらに細く
+                } else if (canvasSize <= 64) {
+                    this.textCtx.lineWidth = Math.max(0.5, this.textCtx.lineWidth * 0.7); // 64px以下は細く
+                }
+            }
+            
+            // 小さいサイズ専用：シャドウを控えめに
+            const originalShadowBlur = this.textCtx.shadowBlur;
+            if (this.textCtx.shadowBlur > 0) {
+                if (canvasSize <= 32) {
+                    this.textCtx.shadowBlur = Math.max(0.5, this.textCtx.shadowBlur * 0.3); // 32px以下はほぼ無し
+                } else if (canvasSize <= 64) {
+                    this.textCtx.shadowBlur = Math.max(1, this.textCtx.shadowBlur * 0.5); // 64px以下は控えめ
+                }
+            }
+            
+            // 座標の精度向上（ピクセル境界に合わせる）
+            this.textCtx.translate(0.5, 0.5);
+            
+            console.log(`小サイズ用フォント最適化適用 - fontSize: ${fontSize}, canvasSize: ${canvasSize}, lineWidth: ${originalLineWidth}→${this.textCtx.lineWidth}, shadowBlur: ${originalShadowBlur}→${this.textCtx.shadowBlur}`);
+        }
+        
+        // テキスト描画（フィル→ストロークの順序で高品質に）
         this.textCtx.fillText(line, x, currentY);
         this.textCtx.strokeText(line, x, currentY);
+        console.log('テキスト描画完了');
+        
+        // 小さいサイズでの座標変換をリセット
+        const currentCanvasSize = Math.min(this.textCanvas.width, this.textCanvas.height);
+        if ((fontSize <= 24 || currentCanvasSize <= 64) && (currentCanvasSize <= 64)) {
+            this.textCtx.translate(-0.5, -0.5); // 座標変換をリセット
+        }
     }
 
     drawGamingImage(image, animationMode, timeOffset) {
@@ -1759,8 +2086,9 @@ class GamingTextGenerator {
                 });
             }
             
-            // 時間ベースの色変化を修正
-            const colorShift = Math.abs(timeOffset * 2) % gamingColors.length; // 配列範囲内に制限
+            // 時間ベースの色変化を修正（完璧なループのため）
+            const normalizedTime = (timeOffset % 1 + 1) % 1; // 0-1の範囲で正規化
+            const colorShift = normalizedTime * gamingColors.length; // 0-配列長の範囲
             
             // グラデーション方向を取得
             const direction = this.textGradientDirection ? this.textGradientDirection.value : 'horizontal';
@@ -2020,6 +2348,142 @@ class GamingTextGenerator {
                     
                     // パルス効果で明度を変化
                     newLightness = Math.max(0.1, Math.min(0.9, newLightness * pulseIntensity));
+                    
+                    // HSLからRGBに変換
+                    const newRGB = this.hslToRgb(newHue, newSaturation, newLightness);
+                    
+                    data[i] = Math.max(0, Math.min(255, Math.round(newRGB[0])));     // R
+                    data[i + 1] = Math.max(0, Math.min(255, Math.round(newRGB[1]))); // G
+                    data[i + 2] = Math.max(0, Math.min(255, Math.round(newRGB[2]))); // B
+                }
+            }
+
+        } else if (animationMode === 'bluepurplepink') {
+            // シアン→青→紫→ピンク→赤寄りグラデーション（虹色グラデーションと同じ構造）
+            let gamingColors = [
+                [0, 255, 255],   // シアン
+                [0, 128, 255],   // 青
+                [64, 64, 255],   // 青紫
+                [128, 0, 255],   // 紫
+                [192, 64, 255],  // ピンク紫
+                [255, 64, 192],  // ピンク
+                [255, 96, 128]   // 赤寄りピンク
+            ];
+            
+            // 彩度に応じて色を調整
+            if (saturationLevel !== 1.0) {
+                gamingColors = gamingColors.map(color => {
+                    const hexColor = `#${color[0].toString(16).padStart(2, '0')}${color[1].toString(16).padStart(2, '0')}${color[2].toString(16).padStart(2, '0')}`;
+                    const adjustedHex = this.adjustColorSaturation(hexColor, saturationLevel);
+                    const r = parseInt(adjustedHex.substr(1, 2), 16);
+                    const g = parseInt(adjustedHex.substr(3, 2), 16);
+                    const b = parseInt(adjustedHex.substr(5, 2), 16);
+                    return [r, g, b];
+                });
+            }
+            
+            // 時間ベースの色変化を修正（完璧なループのため）
+            const normalizedTime = (timeOffset % 1 + 1) % 1; // 0-1の範囲で正規化
+            const colorShift = normalizedTime * gamingColors.length; // 0-配列長の範囲
+            
+            // グラデーション方向を取得
+            const direction = this.textGradientDirection ? this.textGradientDirection.value : 'horizontal';
+            
+            for (let i = 0; i < data.length; i += 4) {
+                const pixelIndex = i / 4;
+                const x = pixelIndex % sourceCanvas.width;
+                const y = Math.floor(pixelIndex / sourceCanvas.width);
+                
+                // グラデーション方向に応じて位置を計算
+                let position;
+                switch (direction) {
+                    case 'horizontal':
+                        position = x / sourceCanvas.width; // 0-1の範囲
+                        break;
+                    case 'vertical':
+                        position = y / sourceCanvas.height; // 0-1の範囲
+                        break;
+                    case 'diagonal1':
+                        // 左上→右下
+                        position = (x / sourceCanvas.width + y / sourceCanvas.height) / 2; // 0-1の範囲
+                        break;
+                    case 'diagonal2':
+                        // 右上→左下
+                        position = ((sourceCanvas.width - x) / sourceCanvas.width + y / sourceCanvas.height) / 2; // 0-1の範囲
+                        break;
+                    default:
+                        position = x / sourceCanvas.width; // デフォルトは横方向
+                }
+                
+                const colorFloat = (position * gamingColors.length + colorShift) % gamingColors.length;
+                const colorIndex = Math.floor(Math.abs(colorFloat)) % gamingColors.length;
+                const nextColorIndex = (colorIndex + 1) % gamingColors.length;
+                const blend = Math.max(0, Math.min(1, colorFloat - Math.floor(colorFloat))); // 0-1の範囲に確実に制限
+                
+                const color1 = gamingColors[colorIndex];
+                const color2 = gamingColors[nextColorIndex];
+                
+                // 色の安全性チェック
+                if (!color1 || !color2) continue;
+                
+                // 2つの色を線形補間
+                const blendedColor = [
+                    Math.round(color1[0] + (color2[0] - color1[0]) * blend),
+                    Math.round(color1[1] + (color2[1] - color1[1]) * blend),
+                    Math.round(color1[2] + (color2[2] - color1[2]) * blend)
+                ];
+                
+                if (data[i + 3] > 0) { // 透明でないピクセルのみ
+                    // 元画像の色を取得
+                    const originalR = data[i];
+                    const originalG = data[i + 1];
+                    const originalB = data[i + 2];
+                    
+                    // 元画像のRGBをHSLに変換
+                    const originalHSL = this.rgbToHsl(originalR, originalG, originalB);
+                    
+                    // ブレンド色から基準色相を取得（青→紫→ピンクの範囲）
+                    const targetHSL = this.rgbToHsl(blendedColor[0], blendedColor[1], blendedColor[2]);
+                    
+                    // 元の色相をベースに、青→紫→ピンクの範囲で色相をシフト
+                    let newHue = originalHSL[0]; // 元の色相
+                    
+                    // 時間とポジションに基づいて色相をシフト（シアン→青→紫→ピンク→赤寄りの範囲内）
+                    const baseHue = 180 / 360; // シアンの色相（0-1の範囲）
+                    const hueRange = 160 / 360; // 160°の色相範囲（シアンから赤寄りピンクまで）
+                    const hueShift = (timeOffset * 2 + position * 2) % 1; // 0-1の範囲
+                    
+                    // シアン→青→紫→ピンク→赤寄りの範囲内での色相を計算
+                    let targetHueInRange = (baseHue + hueRange * hueShift);
+                    if (targetHueInRange >= 1) targetHueInRange -= 1; // 0-1の範囲に正規化
+                    
+                    // 元の色相と目標色相をブレンド（シアン→青→紫→ピンク→赤寄りの影響を適用）
+                    const hueBlend = 0.7; // グラデーションの影響度
+                    newHue = (originalHSL[0] * (1 - hueBlend) + targetHueInRange * hueBlend);
+                    if (newHue >= 1) newHue -= 1; // 0-1の範囲に正規化
+                    
+                    // 彩度を調整（元の彩度をベースに強化）
+                    let newSaturation = originalHSL[1];
+                    if (newSaturation < 0.3) {
+                        // 元々彩度が低い部分は適度に強化
+                        newSaturation = Math.min(0.8, newSaturation + 0.4) * saturationLevel;
+                    } else {
+                        // 元々彩度がある部分は元の値を活かしつつ調整
+                        newSaturation = Math.min(1.0, newSaturation * 1.2) * saturationLevel;
+                    }
+                    
+                    // 明度を適度に調整（元の明暗を保持）
+                    let newLightness = originalHSL[2];
+                    if (originalHSL[2] < 0.2) {
+                        // 暗い部分は少し明るく
+                        newLightness = Math.min(0.6, originalHSL[2] * 1.5);
+                    } else if (originalHSL[2] > 0.8) {
+                        // 明るい部分は少し抑制
+                        newLightness = Math.max(0.4, originalHSL[2] * 0.9);
+                    } else {
+                        // 中間の明度は元の値を活かす
+                        newLightness = originalHSL[2];
+                    }
                     
                     // HSLからRGBに変換
                     const newRGB = this.hslToRgb(newHue, newSaturation, newLightness);
@@ -2312,6 +2776,52 @@ class GamingTextGenerator {
         return `#${adjustedR.toString(16).padStart(2, '0')}${adjustedG.toString(16).padStart(2, '0')}${adjustedB.toString(16).padStart(2, '0')}`;
     }
 
+    // 小さいサイズ用の色強化メソッド
+    enhanceColorForSmallSize(color) {
+        // 小さいサイズ（64px以下）での視認性向上のための色強化
+        if (!color || typeof color !== 'string') {
+            return '#FF0000'; // フォールバック色
+        }
+        
+        const hex = color.replace('#', '');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+        
+        if (isNaN(r) || isNaN(g) || isNaN(b)) {
+            return color; // 無効な色の場合は元の色を返す
+        }
+        
+        // RGBをHSLに変換
+        const hsl = this.rgbToHsl(r, g, b);
+        
+        // 小さいサイズ用の調整
+        let newHue = hsl[0];
+        let newSaturation = hsl[1];
+        let newLightness = hsl[2];
+        
+        // 彩度を強化（視認性向上）
+        newSaturation = Math.min(1.0, newSaturation * 1.3);
+        
+        // 明度を調整（コントラスト向上）
+        if (newLightness < 0.5) {
+            // 暗い色は少し明るく
+            newLightness = Math.min(0.7, newLightness * 1.4);
+        } else {
+            // 明るい色は適度に調整
+            newLightness = Math.max(0.3, newLightness * 0.9);
+        }
+        
+        // HSLからRGBに変換
+        const enhancedRGB = this.hslToRgb(newHue, newSaturation, newLightness);
+        
+        const enhancedR = Math.round(enhancedRGB[0]);
+        const enhancedG = Math.round(enhancedRGB[1]);
+        const enhancedB = Math.round(enhancedRGB[2]);
+        
+        return `#${enhancedR.toString(16).padStart(2, '0')}${enhancedG.toString(16).padStart(2, '0')}${enhancedB.toString(16).padStart(2, '0')}`;
+    }
+
     downloadImage() {
         const link = document.createElement('a');
         link.download = 'gaming_text_' + new Date().getTime() + '.png';
@@ -2333,15 +2843,41 @@ class GamingTextGenerator {
         this.textDownloadGifBtn.disabled = true;
         
         try {
+            console.log('=== テキストGIF生成開始 ===');
+            
+            // メモリ使用量をログ出力（可能な場合）
+            if (window.performance && window.performance.memory) {
+                const mem = window.performance.memory;
+                console.log(`テキストGIF用メモリ使用量 - 使用中: ${(mem.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB, 制限: ${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(2)}MB`);
+            }
+            
+            console.log('テキストフレーム収集を開始...');
             await this.captureFramesForGif();
+            console.log(`テキストフレーム収集完了: ${this.capturedFrames.length}フレーム`);
             
             const gifOptions = {
-                workers: 2,
-                quality: 10,
+                workers: 2, // 安定性を優先してワーカー数を2に
+                quality: 1, // 最高品質（1が最高、30が最低）
                 width: this.textCanvas.width,
                 height: this.textCanvas.height,
-                workerScript: 'gif.worker.js'
+                dither: false, // ディザリングを無効にして高品質に
+                globalPalette: false, // ローカルパレットで色精度向上
+                background: '#000000', // 背景色を明示的に指定
+                workerScript: 'gif.worker.js',
+                // 64x64以下のサイズでの追加最適化
+                repeat: 0, // 無限ループ
+                transparent: null, // 透明色なし（品質優先）
+                dispose: -1 // 自動処理
             };
+            
+            // 小さいサイズの場合の特別な最適化
+            if (this.textCanvas.width <= 64 || this.textCanvas.height <= 64) {
+                gifOptions.quality = 1; // 64x64以下では必ず最高品質
+                gifOptions.dither = false; // ディザリング完全無効
+                gifOptions.globalPalette = false; // ローカルパレット使用
+                console.log('小サイズ用画質最適化を適用');
+            }
+            console.log(`テキストGIFサイズ: ${this.textCanvas.width}x${this.textCanvas.height}`);
             
             // 透過背景の場合の設定
             if (this.textTransparentBg.checked) {
@@ -2352,6 +2888,7 @@ class GamingTextGenerator {
                 gifOptions.dither = false;                // ディザリングを無効化
             }
             
+            console.log('テキストGIFエンコーダーを初期化...');
             const gif = new GIF(gifOptions);
             
             const frameCount = this.capturedFrames.length;
@@ -2370,8 +2907,12 @@ class GamingTextGenerator {
             
             // フレーム間隔（ミリ秒）を計算
             const delay = Math.round(1000 / targetFPS); // 1秒 ÷ FPS
+            console.log(`テキストフレーム遅延時間: ${delay}ms, FPS: ${targetFPS}`);
             
-            for (const frameCanvas of this.capturedFrames) {
+            console.log('テキストフレームをGIFに追加中...');
+            for (let i = 0; i < this.capturedFrames.length; i++) {
+                const frameCanvas = this.capturedFrames[i];
+                console.log(`テキストフレーム ${i + 1}/${frameCount} を追加中...`);
                 const frameOptions = {delay: delay, copy: true};
                 
                 // 透過背景の場合の追加設定
@@ -2383,8 +2924,12 @@ class GamingTextGenerator {
                 
                 gif.addFrame(frameCanvas, frameOptions);
             }
+            console.log('テキスト全フレーム追加完了');
             
             gif.on('finished', (blob) => {
+                console.log('テキストGIF生成完了！', blob);
+                console.log(`生成されたテキストGIFサイズ: ${(blob.size / 1024).toFixed(2)}KB`);
+                
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
@@ -2395,16 +2940,41 @@ class GamingTextGenerator {
                 URL.revokeObjectURL(url);
                 this.textDownloadGifBtn.textContent = 'GIFで保存';
                 this.textDownloadGifBtn.disabled = false;
+                console.log('=== テキストGIF生成処理完了 ===');
             });
             
             gif.on('progress', (p) => {
-                this.textDownloadGifBtn.textContent = `GIF生成中... ${Math.round(p*100)}%`;
+                const progress = Math.round(p * 100);
+                console.log(`テキストGIF生成進行: ${progress}%`);
+                this.textDownloadGifBtn.textContent = `GIF生成中... ${progress}%`;
             });
             
+            gif.on('abort', () => {
+                console.error('テキストGIF生成が中断されました');
+                this.textDownloadGifBtn.textContent = 'GIFで保存';
+                this.textDownloadGifBtn.disabled = false;
+            });
+            
+            console.log('テキストGIF レンダリング開始...');
             gif.render();
         } catch (error) {
-            console.error('GIF生成エラー:', error);
-            alert('GIF生成に失敗しました。');
+            console.error('=== テキストGIF生成エラー詳細 ===');
+            console.error('エラーメッセージ:', error.message);
+            console.error('エラースタック:', error.stack);
+            console.error('エラーオブジェクト:', error);
+            
+            // エラーの種類に応じて詳細な情報を出力
+            if (error.name === 'QuotaExceededError' || error.message.includes('memory')) {
+                console.error('テキストGIF: メモリ不足エラーの可能性があります');
+                alert('テキストGIF生成に失敗しました。\nメモリ不足の可能性があります。\n・テキストサイズを小さくしてみてください\n・フレーム数を減らしてみてください');
+            } else if (error.message.includes('worker') || error.message.includes('Worker')) {
+                console.error('テキストGIF: ワーカースクリプトの読み込みエラーの可能性があります');
+                alert('テキストGIF生成に失敗しました。\nワーカースクリプトの読み込みエラーです。\nページを再読み込みしてください。');
+            } else {
+                console.error('テキストGIF: 不明なエラーです');
+                alert(`テキストGIF生成に失敗しました。\nエラー: ${error.message}\n\nコンソールログで詳細を確認してください。`);
+            }
+            
             this.textDownloadGifBtn.textContent = 'GIFで保存';
             this.textDownloadGifBtn.disabled = false;
         }
@@ -2422,6 +2992,12 @@ class GamingTextGenerator {
                 // 虹色グラデーション：7色の虹色が一周するのに最適なフレーム数
                 const baseRainbowFrames = 14; // 7色 × 2倍の滑らかさ
                 optimalFrames = Math.max(8, Math.round(baseRainbowFrames * (10 / animationSpeed)));
+                break;
+                
+            case 'bluepurplepink':
+                // シアン→青→紫→ピンク→赤寄りグラデーション：7色のグラデーション一周期
+                const baseBluePurplePinkFrames = 14; // 7色 × 2倍の滑らかさ（虹色と同等）
+                optimalFrames = Math.max(8, Math.round(baseBluePurplePinkFrames * (10 / animationSpeed)));
                 break;
                 
             case 'pulse':
@@ -2472,6 +3048,10 @@ class GamingTextGenerator {
         
         const originalStartTime = this.startTime;
         
+        // 通常サイズでの高品質レンダリング（スーパーサンプリングを一時的に無効化）
+        const finalWidth = this.textCanvas.width;
+        const finalHeight = this.textCanvas.height;
+        
         // フレームを生成（GIF再生間隔と完全に一致させる）
         for (let frame = 0; frame < frameCount; frame++) {
             // GIF再生と同じ時間間隔でフレームを生成
@@ -2507,6 +3087,26 @@ class GamingTextGenerator {
             this.textCtx.textAlign = 'center';
             this.textCtx.textBaseline = 'middle';
             
+            // フレーム生成時の最高品質レンダリング設定
+            this.textCtx.imageSmoothingEnabled = true;
+            this.textCtx.imageSmoothingQuality = 'high';
+            this.textCtx.lineCap = 'round';
+            this.textCtx.lineJoin = 'round';
+            if (this.textCtx.textRenderingOptimization) {
+                this.textCtx.textRenderingOptimization = 'optimizeQuality';
+            }
+            
+            // 小さいサイズでの特別な品質最適化
+            const canvasSize = Math.min(this.textCanvas.width, this.textCanvas.height);
+            if (canvasSize <= 64) {
+                // 64x64以下では特別な高品質設定
+                this.textCtx.fontKerning = 'normal';
+                this.textCtx.fontVariantCaps = 'normal';
+                this.textCtx.fontStretch = 'normal';
+                this.textCtx.fontDisplay = 'block';
+                console.log(`フレーム生成時小サイズ最適化適用: ${canvasSize}px`);
+            }
+            
             // 画像またはテキストを描画（プレビューと完全に同じロジック）
             if (this.uploadedImage) {
                 // 画像アニメーションもテキストと同じtimeOffsetを使用
@@ -2527,6 +3127,15 @@ class GamingTextGenerator {
             tempCanvas.height = this.textCanvas.height;
             const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
             
+            // 最高品質レンダリング設定
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            tempCtx.lineCap = 'round';
+            tempCtx.lineJoin = 'round';
+            if (tempCtx.textRenderingOptimization) {
+                tempCtx.textRenderingOptimization = 'optimizeQuality';
+            }
+            
             // フレーム用キャンバスにコピー
             if (this.textTransparentBg.checked) {
                 // 透過背景の場合：アルファチャンネルを保持してコピー
@@ -2538,6 +3147,8 @@ class GamingTextGenerator {
             }
             this.capturedFrames.push(tempCanvas);
         }
+        
+
         
         // 元の状態を復元
         this.startTime = originalStartTime;
@@ -2595,6 +3206,80 @@ function initializeGlobalDarkMode() {
     });
 }
 
+// デバッグ用グローバル関数を追加
+window.debugGaming = {
+    checkMemory: () => {
+        if (window.performance && window.performance.memory) {
+            const mem = window.performance.memory;
+            console.log('=== メモリ使用状況 ===');
+            console.log(`使用中: ${(mem.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB`);
+            console.log(`制限: ${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(2)}MB`);
+            console.log(`使用率: ${((mem.usedJSHeapSize / mem.jsHeapSizeLimit) * 100).toFixed(1)}%`);
+            return mem;
+        } else {
+            console.log('メモリ情報は利用できません（Chromeでのみ利用可能）');
+            return null;
+        }
+    },
+    
+    checkGifWorker: () => {
+        console.log('GIFワーカースクリプトの確認...');
+        fetch('./gif.worker.js')
+            .then(response => {
+                if (response.ok) {
+                    console.log('✓ gif.worker.js は正常に読み込み可能です');
+                } else {
+                    console.error('✗ gif.worker.js の読み込みに失敗:', response.status);
+                }
+            })
+            .catch(error => {
+                console.error('✗ gif.worker.js の確認エラー:', error);
+            });
+    },
+    
+    testSmallGif: async () => {
+        console.log('小さなテストGIFを生成してみます...');
+        try {
+            const testCanvas = document.createElement('canvas');
+            testCanvas.width = 64;
+            testCanvas.height = 64;
+            const ctx = testCanvas.getContext('2d');
+            
+            // 簡単な赤い四角を描画
+            ctx.fillStyle = 'red';
+            ctx.fillRect(0, 0, 64, 64);
+            
+            const gif = new GIF({
+                workers: 1,
+                quality: 10,
+                width: 64,
+                height: 64,
+                workerScript: 'gif.worker.js'
+            });
+            
+            gif.addFrame(testCanvas, {delay: 100});
+            
+            gif.on('finished', (blob) => {
+                console.log('✓ テストGIF生成成功:', blob);
+                console.log(`サイズ: ${blob.size}バイト`);
+            });
+            
+            gif.on('abort', () => {
+                console.error('✗ テストGIF生成が中断されました');
+            });
+            
+            gif.render();
+        } catch (error) {
+            console.error('✗ テストGIF生成エラー:', error);
+        }
+    }
+};
+
+console.log('🎮 ゲーミングツール デバッグ機能が利用可能です:');
+console.log('- window.debugGaming.checkMemory() : メモリ使用量確認');
+console.log('- window.debugGaming.checkGifWorker() : GIFワーカー確認');
+console.log('- window.debugGaming.testSmallGif() : 小さなテストGIF生成');
+
 // アプリケーションを初期化
 document.addEventListener('DOMContentLoaded', () => {
     const concentrationGenerator = new ConcentrationLineGenerator();
@@ -2604,4 +3289,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initializeTabs();
     initializeGlobalDarkMode();
+    
+    // 初期メモリ状況を表示
+    console.log('=== アプリケーション初期化完了 ===');
+    window.debugGaming.checkMemory();
 }); 

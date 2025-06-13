@@ -96,6 +96,7 @@
                         <select id="animationMode">
                             <option value="static">静止画</option>
                             <option value="rainbow">虹色グラデーション</option>
+                            <option value="bluepurplepink">青→紫→ピンク</option>
                             <option value="pulse">ピカピカ点滅</option>
                             <option value="wave">波動効果</option>
                         </select>
@@ -112,17 +113,17 @@
                     <div class="control-group">
                         <label for="gifSizeMode">GIFサイズ:</label>
                         <select id="gifSizeMode">
-                            <option value="small">小サイズ (128x128)</option>
-                            <option value="original">元画像サイズ維持</option>
+                            <option value="small">コンパクト (512x512)</option>
+                            <option value="original" selected>元画像サイズ維持（推奨）</option>
                             <option value="custom">カスタムサイズ</option>
                         </select>
                     </div>
 
                     <div class="control-group" id="customSizeGroup" style="display: none;">
                         <label for="gifWidth">幅:</label>
-                        <input type="number" id="gifWidth" min="64" max="1920" value="256" style="width: 80px;">
+                        <input type="number" id="gifWidth" min="64" max="1920" value="768" style="width: 80px;">
                         <label for="gifHeight">高さ:</label>
-                        <input type="number" id="gifHeight" min="64" max="1920" value="256" style="width: 80px;">
+                        <input type="number" id="gifHeight" min="64" max="1920" value="768" style="width: 80px;">
                     </div>
 
                     <button id="generateBtn">手動で再生成</button>
@@ -228,6 +229,7 @@
                         <label for="textAnimationMode">アニメーション:</label>
                         <select id="textAnimationMode">
                             <option value="rainbow">虹色グラデーション</option>
+                            <option value="bluepurplepink">青→紫→ピンク</option>
                             <option value="pulse">ピカピカ点滅</option>
                             <option value="rainbowPulse">虹色ピカピカ</option>
                         </select>
