@@ -1,0 +1,886 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 10px;
+    transition: all 0.3s ease;
+}
+
+/* ダークモード全体スタイル */
+body.dark-mode {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+/* ダークモード時のコンテナ */
+body.dark-mode .container {
+    background: #2a2a3e;
+    color: #e0e0e0;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* ヘッダーセクション */
+.header-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 15px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+h1 {
+    text-align: center;
+    color: white;
+    font-size: 2em;
+    font-weight: 300;
+    letter-spacing: 1px;
+    margin: 0;
+}
+
+/* ダークモード切り替えボタン */
+.global-dark-mode-toggle {
+    position: absolute;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50px;
+    padding: 8px 12px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.global-dark-mode-toggle:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.global-dark-mode-toggle .dark-icon {
+    display: none;
+}
+
+body.dark-mode .global-dark-mode-toggle .light-icon {
+    display: none;
+}
+
+body.dark-mode .global-dark-mode-toggle .dark-icon {
+    display: inline;
+}
+
+/* ダークモード時のヘッダー */
+body.dark-mode .header-section {
+    background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+}
+
+.upload-section {
+    padding: 15px;
+    text-align: center;
+    border-bottom: 1px solid #eee;
+}
+
+.upload-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.upload-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+}
+
+#fileName {
+    display: block;
+    margin-top: 15px;
+    color: #666;
+    font-style: italic;
+}
+
+/* タブナビゲーション */
+.tab-navigation {
+    display: flex;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #eee;
+    transition: border-color 0.3s ease;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: #666;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.tab-btn.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+}
+
+.tab-btn:hover {
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.05);
+}
+
+/* ダークモード時のタブナビゲーション */
+body.dark-mode .tab-navigation {
+    border-bottom-color: #444;
+}
+
+body.dark-mode .tab-btn {
+    color: #b0b0b0;
+}
+
+body.dark-mode .tab-btn:hover {
+    color: #8bb6ff;
+    background: rgba(139, 182, 255, 0.1);
+}
+
+body.dark-mode .tab-btn.active {
+    color: #8bb6ff;
+    border-bottom-color: #8bb6ff;
+    background: linear-gradient(135deg, rgba(139, 182, 255, 0.1) 0%, rgba(160, 120, 200, 0.1) 100%);
+}
+
+/* タブコンテンツ */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+/* 左側のコントロールエリア */
+.controls-area {
+    flex: 1;
+    min-width: 400px;
+}
+
+/* 右側のプレビューエリア */
+.preview-area {
+    flex: 1;
+    min-width: 400px;
+    position: sticky;
+    top: 10px;
+}
+
+.controls-section {
+    padding: 15px;
+    background: #f8f9fa;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    border-radius: 10px;
+    margin-bottom: 0;
+    transition: all 0.3s ease;
+}
+
+.text-controls-section {
+    padding: 15px;
+    background: #f8f9fa;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    border-radius: 10px;
+    margin-bottom: 0;
+    transition: all 0.3s ease;
+}
+
+.control-group {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+/* ダークモード時のコントロールエリア */
+body.dark-mode .controls-section,
+body.dark-mode .text-controls-section {
+    background: #3d3d52;
+}
+
+body.dark-mode .control-group {
+    background: #4a4a62;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.control-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #333;
+    font-size: 13px;
+    transition: color 0.3s ease;
+}
+
+.control-group input[type="range"] {
+    width: 100%;
+    margin-bottom: 5px;
+    appearance: none;
+    height: 6px;
+    background: #ddd;
+    border-radius: 3px;
+    outline: none;
+    transition: background 0.3s ease;
+}
+
+.control-group input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.control-group input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.control-group select {
+    width: 100%;
+    padding: 6px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+/* ダークモード時のフォーム要素 */
+body.dark-mode .control-group label {
+    color: #e0e0e0;
+}
+
+body.dark-mode .control-group input[type="range"] {
+    background: #555;
+}
+
+body.dark-mode .control-group select {
+    background: #555;
+    color: #e0e0e0;
+    border-color: #666;
+}
+
+body.dark-mode .control-group select option {
+    background: #555;
+    color: #e0e0e0;
+}
+
+.control-group input[type="color"] {
+    width: 50px;
+    height: 30px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.control-group span {
+    font-weight: 600;
+    color: #667eea;
+    font-size: 12px;
+}
+
+button {
+    grid-column: 1 / -1;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin: 5px;
+}
+
+#generateBtn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+#generateBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+}
+
+#downloadBtn {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+}
+
+#downloadBtn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.6);
+}
+
+#downloadBtn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+#downloadGifBtn {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    color: white;
+    box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+}
+
+#downloadGifBtn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255, 107, 107, 0.6);
+}
+
+#downloadGifBtn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+#downloadRealGifBtn {
+    background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+    color: white;
+    box-shadow: 0 5px 15px rgba(155, 89, 182, 0.4);
+}
+
+#downloadRealGifBtn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(155, 89, 182, 0.6);
+}
+
+#downloadRealGifBtn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* テキストジェネレーター用ボタン */
+#textGenerateBtn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+#textGenerateBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+}
+
+#textDownloadBtn {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+}
+
+#textDownloadBtn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.6);
+}
+
+#textDownloadBtn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+#textDownloadGifBtn {
+    background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+    color: white;
+    box-shadow: 0 5px 15px rgba(155, 89, 182, 0.4);
+}
+
+#textDownloadGifBtn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(155, 89, 182, 0.6);
+}
+
+#textDownloadGifBtn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* テキストキャンバス */
+#textCanvas {
+    max-width: 100%;
+    max-height: 80vh;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    background-color: black;
+    transition: all 0.3s ease;
+    /* 透過背景の場合のチェッカーボード背景 */
+    background-image: 
+        linear-gradient(45deg, #ccc 25%, transparent 25%), 
+        linear-gradient(-45deg, #ccc 25%, transparent 25%), 
+        linear-gradient(45deg, transparent 75%, #ccc 75%), 
+        linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+
+/* 透過背景が有効な場合のスタイル */
+#textCanvas.transparent-bg {
+    background-color: transparent;
+}
+
+#textCanvas:hover {
+    border-color: #667eea;
+    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.2);
+    transform: translateY(-2px);
+}
+
+/* テキスト入力フィールド */
+#textInput {
+    width: 100%;
+    padding: 6px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+    resize: vertical;
+    min-height: 40px;
+    font-family: inherit;
+    color: #333;
+    transition: all 0.3s ease;
+}
+
+/* ダークモード時のテキスト入力 */
+body.dark-mode #textInput {
+    background: #555;
+    color: #e0e0e0;
+    border-color: #666;
+}
+
+body.dark-mode #textInput::placeholder {
+    color: #aaa;
+}
+
+/* ラジオボタンのスタイル */
+.radio-group {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-top: 5px;
+}
+
+.radio-group input[type="radio"] {
+    margin: 0 5px 0 0;
+    transform: scale(1.2);
+    accent-color: #667eea;
+}
+
+.radio-group label {
+    margin: 0 !important;
+    font-weight: 500;
+    color: #333;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+}
+
+/* ダークモード時のラジオボタン */
+body.dark-mode .radio-group label {
+    color: #e0e0e0;
+}
+
+/* ダークモード・ライトモードプレビュー */
+.mode-toggle-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.mode-toggle-section h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    text-align: center;
+    transition: color 0.3s ease;
+}
+
+/* ダークモード時のプレビューセクション */
+body.dark-mode .mode-toggle-section,
+body.dark-mode .slack-preview-section {
+    background: #3d3d52;
+    border-color: #555;
+}
+
+body.dark-mode .mode-toggle-section h3,
+body.dark-mode .slack-preview-section h3 {
+    color: #e0e0e0;
+}
+
+body.dark-mode .mode-preview-item h4,
+body.dark-mode .slack-size-item h4 {
+    color: #b0b0b0;
+}
+
+body.dark-mode .light-theme-demo,
+body.dark-mode .slack-demo {
+    border-color: #555;
+}
+
+
+
+.mode-preview {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.mode-preview-item {
+    flex: 1;
+    text-align: center;
+}
+
+.mode-preview-item h4 {
+    margin: 0 0 8px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+}
+
+.light-theme-demo {
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    border: 2px solid #ddd;
+}
+
+.dark-theme-demo {
+    background: #2c2c2c;
+    padding: 10px;
+    border-radius: 8px;
+    border: 2px solid #444;
+}
+
+#lightCanvas, #darkCanvas {
+    width: 100%;
+    max-width: 100px;
+    height: auto;
+    border-radius: 4px;
+}
+
+/* Slackスタンププレビュー */
+.slack-preview-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.slack-preview-section h3 {
+    margin: 0 0 15px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    text-align: center;
+    transition: color 0.3s ease;
+}
+
+.slack-sizes {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.slack-size-item {
+    text-align: center;
+}
+
+.slack-size-item h4 {
+    margin: 0 0 8px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+}
+
+.slack-mode-previews {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.slack-mode-item {
+    text-align: center;
+}
+
+.slack-mode-item span {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.slack-demo {
+    padding: 8px;
+    border-radius: 8px;
+    border: 2px solid #ddd;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.slack-demo.slack-light {
+    background: #f8f9fa;
+}
+
+.slack-demo.slack-dark {
+    background: #2c2c2c;
+    border-color: #555;
+}
+
+#slack32LightCanvas,
+#slack32DarkCanvas,
+#slack64LightCanvas,
+#slack64DarkCanvas {
+    border-radius: 4px;
+    background: transparent;
+    /* 32×32pxでも見やすくする */
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+}
+
+/* ダークモード時のSlackプレビュー */
+body.dark-mode .slack-mode-item span {
+    color: #b0b0b0;
+}
+
+.canvas-section {
+    padding: 15px;
+    text-align: center;
+    background: #f8f9fa;
+    border-radius: 10px;
+    height: fit-content;
+}
+
+.preview-info {
+    margin-bottom: 10px;
+    padding: 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    color: white;
+    box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+}
+
+.preview-info p {
+    margin: 3px 0;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+#canvas {
+    max-width: 100%;
+    max-height: 80vh;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    background-color: white;
+    transition: all 0.3s ease;
+}
+
+#canvas:hover {
+    border-color: #667eea;
+    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.2);
+    transform: translateY(-2px);
+}
+
+#singleColorGroup {
+    display: block;
+}
+
+#singleColorGroup.hidden {
+    display: none;
+}
+
+@media (max-width: 1200px) {
+    .tab-content.active {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .controls-area,
+    .preview-area {
+        min-width: unset;
+        flex: none;
+    }
+    
+    .preview-area {
+        position: static;
+    }
+}
+
+@media (max-width: 768px) {
+    .controls-section {
+        grid-template-columns: 1fr;
+        padding: 10px;
+    }
+    
+    .text-controls-section {
+        grid-template-columns: 1fr;
+        padding: 10px;
+    }
+    
+    .header-section {
+        padding: 10px;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .global-dark-mode-toggle {
+        position: static;
+        align-self: center;
+    }
+    
+    h1 {
+        font-size: 1.8em;
+        margin: 0;
+    }
+    
+    .upload-section, .canvas-section {
+        padding: 10px;
+    }
+    
+    .container {
+        padding: 5px;
+    }
+    
+    .tab-content.active {
+        gap: 8px;
+    }
+    
+    /* プレビューセクションのモバイル対応 */
+    .mode-toggle-section,
+    .slack-preview-section {
+        margin-top: 15px;
+        padding: 10px;
+    }
+    
+    .mode-toggle-section h3,
+    .slack-preview-section h3 {
+        font-size: 13px;
+    }
+    
+    .mode-preview {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .slack-sizes {
+        flex-direction: column;
+        gap: 15px;
+        align-items: center;
+    }
+    
+    .slack-mode-previews {
+        gap: 8px;
+    }
+    
+    .slack-demo {
+        padding: 6px;
+    }
+    
+    #lightCanvas, #darkCanvas {
+        max-width: 80px;
+    }
+}
+
+/* ダークモード時のその他の要素 */
+body.dark-mode #fileName {
+    color: #b0b0b0;
+}
+
+body.dark-mode .canvas-section {
+    background: #3d3d52;
+}
+
+body.dark-mode .preview-info {
+    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+}
+
+body.dark-mode #canvas,
+body.dark-mode #textCanvas {
+    border-color: #555;
+}
+
+body.dark-mode .control-group span {
+    color: #8bb6ff;
+}
+
+/* フッター */
+.footer {
+    text-align: center;
+    padding: 20px;
+    margin-top: 30px;
+    color: #666;
+    font-size: 14px;
+    border-top: 1px solid #eee;
+    transition: all 0.3s ease;
+}
+
+.footer p {
+    margin: 0;
+    font-weight: 500;
+}
+
+/* ダークモード時のフッター */
+body.dark-mode .footer {
+    color: #b0b0b0;
+    border-top-color: #444;
+} 

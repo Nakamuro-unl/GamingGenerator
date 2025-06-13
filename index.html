@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ゲーミングジェネレーター</title>
+    <!-- External Dependencies -->
+    <!-- gif.js - MIT License (c) 2013 Johan Nordberg - https://github.com/jnordberg/gif.js -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=M+PLUS+1p:wght@400;700;900&family=Kosugi+Maru&family=Sawarabi+Gothic&family=Zen+Kaku+Gothic+New:wght@400;700;900&family=Stick&family=Rampart+One&family=Dela+Gothic+One&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="gif.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header-section">
+            <h1>ゲーミングジェネレーター</h1>
+            <button id="globalDarkModeToggle" class="global-dark-mode-toggle" title="サイト全体のダークモード切り替え">
+                <span class="light-icon">☀️</span>
+                <span class="dark-icon">🌙</span>
+            </button>
+        </div>
+        
+        <!-- タブナビゲーション -->
+        <div class="tab-navigation">
+            <button class="tab-btn" data-tab="concentration">集中線ジェネレーター</button>
+            <button class="tab-btn active" data-tab="text">ゲーミングスタンプ</button>
+        </div>
+
+        <!-- 集中線ジェネレータータブ -->
+        <div id="concentration-tab" class="tab-content">
+            <div class="controls-area">
+                <div class="upload-section">
+                    <label for="imageInput" class="upload-btn">
+                        画像を選択
+                        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                    </label>
+                    <span id="fileName">ファイルが選択されていません</span>
+                </div>
+
+                <div class="controls-section">
+                    <div class="control-group">
+                        <label for="lineCount">線数:</label>
+                                            <input type="range" id="lineCount" min="10" max="300" value="150">
+                    <span id="lineCountValue">150</span>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="lineWidth">線幅:</label>
+                                            <input type="range" id="lineWidth" min="1" max="10" value="6">
+                    <span id="lineWidthValue">6</span>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="colorMode">色:</label>
+                        <select id="colorMode">
+                            <option value="single">単色</option>
+                            <option value="rainbow">ゲーミング虹色</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group" id="singleColorGroup">
+                        <label for="lineColor">線の色:</label>
+                        <input type="color" id="lineColor" value="#000000">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="darkBackground">背景:</label>
+                        <select id="darkBackground">
+                            <option value="original">元画像</option>
+                            <option value="dark">黒背景</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="centerX">中心X:</label>
+                        <input type="range" id="centerX" min="0" max="100" value="50">
+                        <span id="centerXValue">50%</span>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="centerY">中心Y:</label>
+                        <input type="range" id="centerY" min="0" max="100" value="50">
+                        <span id="centerYValue">50%</span>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="centerSize">中心点サイズ:</label>
+                        <input type="range" id="centerSize" min="10" max="100" value="40">
+                        <span id="centerSizeValue">40</span>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="animationMode">アニメーション:</label>
+                        <select id="animationMode">
+                            <option value="static">静止画</option>
+                            <option value="rainbow">虹色グラデーション</option>
+                            <option value="pulse">ピカピカ点滅</option>
+                            <option value="wave">波動効果</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="animationSpeed">アニメ速度:</label>
+                        <input type="range" id="animationSpeed" min="1" max="20" value="5">
+                        <span id="animationSpeedValue">5</span>
+                    </div>
+
+
+
+                    <div class="control-group">
+                        <label for="gifSizeMode">GIFサイズ:</label>
+                        <select id="gifSizeMode">
+                            <option value="small">小サイズ (128x128)</option>
+                            <option value="original">元画像サイズ維持</option>
+                            <option value="custom">カスタムサイズ</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group" id="customSizeGroup" style="display: none;">
+                        <label for="gifWidth">幅:</label>
+                        <input type="number" id="gifWidth" min="64" max="1920" value="256" style="width: 80px;">
+                        <label for="gifHeight">高さ:</label>
+                        <input type="number" id="gifHeight" min="64" max="1920" value="256" style="width: 80px;">
+                    </div>
+
+                    <button id="generateBtn">手動で再生成</button>
+                    <button id="downloadBtn" disabled>画像を保存</button>
+                    <button id="downloadGifBtn" disabled>動画で保存</button>
+                    <button id="downloadRealGifBtn" disabled>GIFで保存</button>
+                </div>
+            </div>
+
+            <div class="preview-area">
+                <div class="canvas-section">
+                    <div class="preview-info">
+                        <p>画像をクリックして集中線の中心点を設定できます</p>
+                        <p>設定を変更すると自動的にプレビューが更新されます</p>
+                    </div>
+                    <canvas id="canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ゲーミングスタンプタブ -->
+        <div id="text-tab" class="tab-content active">
+            <div class="controls-area">
+                <div class="text-controls-section">
+                    <div class="control-group">
+                        <label>作成モード:</label>
+                        <div class="radio-group">
+                            <input type="radio" id="modeText" name="creationMode" value="text" checked>
+                            <label for="modeText">テキスト</label>
+                            <input type="radio" id="modeImage" name="creationMode" value="image">
+                            <label for="modeImage">画像</label>
+                        </div>
+                    </div>
+
+                    <div class="control-group" id="textInputGroup">
+                        <label for="textInput">テキスト:</label>
+                        <textarea id="textInput" placeholder="ゲーミングスタンプを入力&#10;改行も可能です" rows="3">GAMING</textarea>
+                    </div>
+
+                    <div class="control-group" id="imageInputGroup" style="display: none;">
+                        <label for="textImageInput">画像を選択:</label>
+                        <input type="file" id="textImageInput" accept="image/*">
+                        <small>選択した画像にアニメーション効果を適用</small>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="textSize">文字サイズ:</label>
+                        <input type="range" id="textSize" min="20" max="200" value="32">
+                        <span id="textSizeValue">32px</span>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="textFont">フォント:</label>
+                        <select id="textFont">
+                            <!-- 日本語対応フォント -->
+                            <optgroup label="日本語対応フォント">
+                                <option value="'Yu Gothic UI', 'Yu Gothic', YuGothic, sans-serif">游ゴシック (Yu Gothic)</option>
+                                <option value="'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'ヒラギノ角ゴ ProN', sans-serif">ヒラギノ角ゴ (macOS)</option>
+                                <option value="'MS Gothic', 'ＭＳ ゴシック', monospace">MS ゴシック (Windows)</option>
+                                <option value="'MS PGothic', 'ＭＳ Ｐゴシック', sans-serif">MS Pゴシック (Windows)</option>
+                                <option value="'Meiryo', 'メイリオ', sans-serif">メイリオ (Windows)</option>
+                                <option value="'Noto Sans JP', sans-serif">Noto Sans JP (Google)</option>
+                                <option value="'M PLUS 1p', sans-serif">M PLUS 1p (Google)</option>
+                                <option value="'Kosugi Maru', sans-serif">小杉丸ゴシック (Google)</option>
+                                <option value="'Sawarabi Gothic', sans-serif">さわらびゴシック (Google)</option>
+                                <option value="'Zen Kaku Gothic New', sans-serif">Zen角ゴシック New (Google)</option>
+                                <option value="'Dela Gothic One', sans-serif">Dela Gothic One (太字・Google)</option>
+                                <option value="'Rampart One', sans-serif">Rampart One (装飾・Google)</option>
+                                <option value="'Stick', sans-serif">Stick (極細・Google)</option>
+                                <option value="sans-serif">サンセリフ (システム標準)</option>
+                            </optgroup>
+                            <!-- 英語フォント -->
+                            <optgroup label="英語フォント">
+                                <option value="Arial">Arial</option>
+                                <option value="Arial Black">Arial Black</option>
+                                <option value="Helvetica">Helvetica</option>
+                                <option value="Times New Roman">Times New Roman</option>
+                                <option value="Georgia">Georgia</option>
+                                <option value="Verdana">Verdana</option>
+                                <option value="Courier New">Courier New</option>
+                                <option value="Impact">Impact</option>
+                                <option value="Comic Sans MS">Comic Sans MS</option>
+                                <option value="Trebuchet MS">Trebuchet MS</option>
+                                <option value="Palatino">Palatino</option>
+                                <option value="Garamond">Garamond</option>
+                                <option value="Bookman">Bookman</option>
+                                <option value="Tahoma">Tahoma</option>
+                                <option value="Lucida Console">Lucida Console</option>
+                                <option value="Monaco">Monaco</option>
+                            </optgroup>
+                            <!-- 汎用フォント -->
+                            <optgroup label="汎用フォント">
+                                <option value="serif">serif (ブラウザ標準)</option>
+                                <option value="sans-serif">sans-serif (ブラウザ標準)</option>
+                                <option value="monospace">monospace (ブラウザ標準)</option>
+                                <option value="cursive">cursive (ブラウザ標準)</option>
+                                <option value="fantasy">fantasy (ブラウザ標準)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="textAnimationMode">アニメーション:</label>
+                        <select id="textAnimationMode">
+                            <option value="rainbow">虹色グラデーション</option>
+                            <option value="pulse">ピカピカ点滅</option>
+                            <option value="rainbowPulse">虹色ピカピカ</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group" id="gradientDirectionGroup" style="display: none;">
+                        <label for="textGradientDirection">グラデーション方向:</label>
+                        <select id="textGradientDirection">
+                            <option value="horizontal">横方向（左→右）</option>
+                            <option value="vertical">縦方向（上→下）</option>
+                            <option value="diagonal1">斜め方向（左上→右下）</option>
+                            <option value="diagonal2">斜め方向（右上→左下）</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="textBaseColor">ベースカラー:</label>
+                        <input type="color" id="textBaseColor" value="#FF0000">
+                        <small>ピカピカ点滅・虹色ピカピカ時のベース色</small>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="textAnimationSpeed">アニメ速度:</label>
+                        <input type="range" id="textAnimationSpeed" min="1" max="20" value="5">
+                        <span id="textAnimationSpeedValue">5</span>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="textSaturation">彩度:</label>
+                        <input type="range" id="textSaturation" min="0" max="150" value="100">
+                        <span id="textSaturationValue">100%</span>
+                        <small>ゲーミング効果の彩度を調整</small>
+                    </div>
+
+
+
+                    <div class="control-group">
+                        <label for="textCanvasWidth">キャンバス幅:</label>
+                        <input type="number" id="textCanvasWidth" min="32" max="1920" value="64" style="width: 80px;">
+                        <label for="textCanvasHeight">キャンバス高さ:</label>
+                        <input type="number" id="textCanvasHeight" min="32" max="1080" value="64" style="width: 80px;">
+                    </div>
+
+                    <div class="control-group">
+                                        <label for="textTransparentBg">背景透過:</label>
+                <input type="checkbox" id="textTransparentBg" checked>
+                        <small>チェックすると背景が透明になります</small>
+                    </div>
+
+                    <div class="control-group">
+                                        <label for="textStretch">テキスト引き伸ばし:</label>
+                <input type="checkbox" id="textStretch" checked>
+                        <small>テキストをキャンバス全体に引き伸ばします</small>
+                    </div>
+
+                    <div class="control-group">
+                                        <label for="textGlow">グロー効果:</label>
+                <input type="checkbox" id="textGlow">
+                        <small>発光効果を有効にします（透過時は無効推奨）</small>
+                    </div>
+
+                    <button id="textGenerateBtn">プレビュー生成</button>
+                    <button id="textDownloadBtn" disabled>画像を保存</button>
+                    <button id="textDownloadGifBtn" disabled>GIFで保存</button>
+                </div>
+            </div>
+
+            <div class="preview-area">
+                <div class="canvas-section">
+                    <div class="preview-info">
+                        <p>テキストを入力してプレビュー生成ボタンを押してください</p>
+                    </div>
+                    <canvas id="textCanvas"></canvas>
+                    
+                    <!-- テーマプレビュー -->
+                    <div class="mode-toggle-section">
+                        <h3>テーマプレビュー</h3>
+                        <div class="mode-preview">
+                            <div class="mode-preview-item">
+                                <h4>ライトモード</h4>
+                                <div class="light-theme-demo">
+                                    <canvas id="lightCanvas"></canvas>
+                                </div>
+                            </div>
+                            <div class="mode-preview-item">
+                                <h4>ダークモード</h4>
+                                <div class="dark-theme-demo">
+                                    <canvas id="darkCanvas"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Slackスタンププレビュー -->
+                    <div class="slack-preview-section">
+                        <h3>Slackスタンプサイズプレビュー</h3>
+                        <div class="slack-sizes">
+                            <div class="slack-size-item">
+                                <h4>32×32px (小)</h4>
+                                <div class="slack-mode-previews">
+                                    <div class="slack-mode-item">
+                                        <span>ライト</span>
+                                        <div class="slack-demo slack-light">
+                                            <canvas id="slack32LightCanvas" width="32" height="32"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="slack-mode-item">
+                                        <span>ダーク</span>
+                                        <div class="slack-demo slack-dark">
+                                            <canvas id="slack32DarkCanvas" width="32" height="32"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slack-size-item">
+                                <h4>64×64px (標準)</h4>
+                                <div class="slack-mode-previews">
+                                    <div class="slack-mode-item">
+                                        <span>ライト</span>
+                                        <div class="slack-demo slack-light">
+                                            <canvas id="slack64LightCanvas" width="64" height="64"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="slack-mode-item">
+                                        <span>ダーク</span>
+                                        <div class="slack-demo slack-dark">
+                                            <canvas id="slack64DarkCanvas" width="64" height="64"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- フッター -->
+    <footer class="footer">
+        <p>&copy; Famulite Lab.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html> 
