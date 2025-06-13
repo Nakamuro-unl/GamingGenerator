@@ -882,7 +882,10 @@ body.dark-mode .slack-mode-item span {
         border-radius: 10px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         margin-bottom: 10px;
-        padding: 10px;
+        padding: 8px;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
     }
     
     /* ダークモード時のプレビューエリア */
@@ -927,35 +930,59 @@ body.dark-mode .slack-mode-item span {
     .mode-toggle-section,
     .slack-preview-section {
         margin-top: 15px;
-        padding: 10px;
+        padding: 8px;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        box-sizing: border-box;
     }
     
     .mode-toggle-section h3,
     .slack-preview-section h3 {
         font-size: 13px;
+        margin-bottom: 8px;
     }
     
     .mode-preview {
         flex-direction: column;
-        gap: 8px;
+        gap: 6px;
+        align-items: center;
     }
     
+    .mode-preview-item {
+        width: 100%;
+        max-width: 120px;
+    }
+    
+    /* Slackプレビューのモバイル最適化 */
     .slack-sizes {
         flex-direction: column;
-        gap: 15px;
+        gap: 10px;
         align-items: center;
     }
     
     .slack-mode-previews {
-        gap: 8px;
+        gap: 5px;
+        flex-wrap: wrap;
+        justify-content: center;
     }
     
     .slack-demo {
-        padding: 6px;
+        padding: 4px;
+        min-width: 40px;
     }
     
     #lightCanvas, #darkCanvas {
-        max-width: 80px;
+        max-width: 60px;
+        max-height: 60px;
+    }
+    
+    #slack32LightCanvas,
+    #slack32DarkCanvas,
+    #slack64LightCanvas,
+    #slack64DarkCanvas {
+        max-width: 32px;
+        max-height: 32px;
     }
     
     /* モバイル専用：注意書きセクションの調整 */
@@ -1026,8 +1053,35 @@ body.dark-mode .control-group span {
     }
     
     .preview-area {
-        margin-bottom: 10px;
-        padding: 8px;
+        margin-bottom: 8px;
+        padding: 6px;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        box-sizing: border-box;
+    }
+    
+    .mode-toggle-section,
+    .slack-preview-section {
+        padding: 6px;
+        margin-top: 10px;
+    }
+    
+    .slack-mode-previews {
+        gap: 3px;
+    }
+    
+    .slack-demo {
+        padding: 3px;
+        min-width: 36px;
+    }
+    
+    #slack32LightCanvas,
+    #slack32DarkCanvas,
+    #slack64LightCanvas,
+    #slack64DarkCanvas {
+        max-width: 28px;
+        max-height: 28px;
     }
     
     #canvas, #textCanvas {
@@ -1046,10 +1100,16 @@ body.dark-mode .control-group span {
     .controls-section, .text-controls-section {
         padding: 8px;
         gap: 8px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
     }
     
     .control-group {
         padding: 8px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
     }
     
     .control-group label {
@@ -1060,6 +1120,26 @@ body.dark-mode .control-group span {
         padding: 6px 12px;
         font-size: 12px;
         margin: 3px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .control-group input[type="range"] {
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .control-group select {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .radio-group {
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-start;
     }
 }
 
