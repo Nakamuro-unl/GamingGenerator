@@ -1010,6 +1010,7 @@ class GamingTextGenerator {
         this.textSize = document.getElementById('textSize');
         this.textSizeValue = document.getElementById('textSizeValue');
         this.textFont = document.getElementById('textFont');
+        this.textBold = document.getElementById('textBold');
         this.textAnimationMode = document.getElementById('textAnimationMode');
         this.textGradientDirection = document.getElementById('textGradientDirection');
         this.gradientDirectionGroup = document.getElementById('gradientDirectionGroup');
@@ -1017,6 +1018,9 @@ class GamingTextGenerator {
         this.textAnimationSpeedValue = document.getElementById('textAnimationSpeedValue');
         this.textSaturation = document.getElementById('textSaturation');
         this.textSaturationValue = document.getElementById('textSaturationValue');
+        this.textGradientDensity = document.getElementById('textGradientDensity');
+        this.textGradientDensityValue = document.getElementById('textGradientDensityValue');
+        this.gradientDensityGroup = document.getElementById('gradientDensityGroup');
         this.textBaseColor = document.getElementById('textBaseColor');
         this.textCanvasWidth = document.getElementById('textCanvasWidth');
         this.textCanvasHeight = document.getElementById('textCanvasHeight');
@@ -1061,6 +1065,7 @@ class GamingTextGenerator {
             this.autoGeneratePreview();
         });
         this.textFont.addEventListener('change', () => this.autoGeneratePreview());
+        this.textBold.addEventListener('change', () => this.autoGeneratePreview());
         this.textAnimationMode.addEventListener('change', () => this.handleAnimationModeChange());
         this.textGradientDirection.addEventListener('change', () => this.autoGeneratePreview());
         this.textAnimationSpeed.addEventListener('input', (e) => {
@@ -1068,6 +1073,10 @@ class GamingTextGenerator {
         });
         this.textSaturation.addEventListener('input', (e) => {
             this.textSaturationValue.textContent = e.target.value + '%';
+            this.autoGeneratePreview();
+        });
+        this.textGradientDensity.addEventListener('input', (e) => {
+            this.textGradientDensityValue.textContent = e.target.value;
             this.autoGeneratePreview();
         });
         this.textBaseColor.addEventListener('input', () => this.autoGeneratePreview());
@@ -1127,17 +1136,21 @@ class GamingTextGenerator {
         this.textCanvas.style.width = width + 'px';
         this.textCanvas.style.height = height + 'px';
         
-        // 高品質レンダリング設定
-        this.textCtx.imageSmoothingEnabled = true;
-        this.textCtx.imageSmoothingQuality = 'high';
-        this.textCtx.lineCap = 'round';
-        this.textCtx.lineJoin = 'round';
-        if (this.textCtx.textRenderingOptimization) {
-            this.textCtx.textRenderingOptimization = 'optimizeQuality';
-        }
+        // 高品質レンダリング設定（黒縁除去＋透過対応＋品質保持）
+        this.textCtx.imageSmoothingEnabled = true; // 滑らかな描画
+        this.textCtx.imageSmoothingQuality = 'high'; // 高品質
+        this.textCtx.textRenderingOptimization = 'optimizeQuality'; // 品質優先
+        this.textCtx.lineCap = 'round'; // 滑らかな線端
+        this.textCtx.lineJoin = 'round'; // 滑らかな接続
+        this.textCtx.shadowColor = 'rgba(0,0,0,0)'; // シャドウ無効化
+        this.textCtx.shadowBlur = 0;
+        this.textCtx.globalCompositeOperation = 'source-over';
         
-        // キャンバスを完全に透明にクリア
+        // キャンバスを完全に透明にクリア（確実な透過処理）
         this.textCtx.clearRect(0, 0, width, height);
+        
+        // 透過背景を確実に設定
+        this.textCanvas.style.backgroundColor = 'transparent';
         
         // テーマプレビューキャンバスのサイズを設定
         this.lightCanvas.width = 100;
@@ -1198,8 +1211,10 @@ class GamingTextGenerator {
         // グラデーション方向の選択UIの表示/非表示を制御
         if (this.textAnimationMode.value === 'rainbow' || this.textAnimationMode.value === 'bluepurplepink') {
             this.gradientDirectionGroup.style.display = 'block';
+            this.gradientDensityGroup.style.display = 'block';
         } else {
             this.gradientDirectionGroup.style.display = 'none';
+            this.gradientDensityGroup.style.display = 'none';
         }
         
         if (this.textAnimationMode.value === 'rainbow' || this.textAnimationMode.value === 'bluepurplepink' || this.textAnimationMode.value === 'pulse' || this.textAnimationMode.value === 'rainbowPulse') {
@@ -1246,35 +1261,40 @@ class GamingTextGenerator {
         console.log('animationMode:', animationMode);
         console.log('isTransparent:', isTransparent);
         
-        // キャンバスをクリア（完全に透明にリセット）
+        // キャンバスを完全透明でクリア（確実に透過処理）
         this.textCtx.clearRect(0, 0, this.textCanvas.width, this.textCanvas.height);
+        this.textCtx.globalCompositeOperation = 'source-over';
         
-        // 透過でない場合のみ黒背景を描画
+        // 透過設定時は背景を一切描画しない（黒い部分を完全除去）
         if (!isTransparent) {
-            this.textCtx.fillStyle = '#000000';
+            // 非透過時のみ、白背景を使用（黒背景だと黒い部分が目立つため）
+            this.textCtx.fillStyle = '#FFFFFF';
             this.textCtx.fillRect(0, 0, this.textCanvas.width, this.textCanvas.height);
-            console.log('黒背景を描画しました');
+            console.log('白背景を描画しました（透過OFF時）');
+        } else {
+            console.log('透過背景モード：背景描画をスキップ');
         }
         
         // テキストサイズを取得（スライダーの値を使用）
         const fontSize = parseInt(this.textSize.value);
         console.log('fontSize:', fontSize);
         
-        // フォント設定（選択されたフォントを使用）
+        // フォント設定（太字オプション対応、黒縁なし）
         const selectedFont = this.textFont ? this.textFont.value : 'Arial';
-        this.textCtx.font = `bold ${fontSize}px ${selectedFont}`;
+        const fontWeight = this.textBold && this.textBold.checked ? 'bold' : 'normal';
+        this.textCtx.font = `${fontWeight} ${fontSize}px ${selectedFont}`;
         this.textCtx.textAlign = 'center';
         this.textCtx.textBaseline = 'middle';
-        console.log('font設定:', this.textCtx.font);
+        console.log('フォント設定:', this.textCtx.font);
         
-        // 最高品質レンダリング設定（プレビュー用）
-        this.textCtx.imageSmoothingEnabled = true;
-        this.textCtx.imageSmoothingQuality = 'high';
-        this.textCtx.lineCap = 'round';
-        this.textCtx.lineJoin = 'round';
-        if (this.textCtx.textRenderingOptimization) {
-            this.textCtx.textRenderingOptimization = 'optimizeQuality';
-        }
+        // 高品質レンダリング設定（黒縁除去、品質保持）
+        this.textCtx.imageSmoothingEnabled = true; // 滑らかな描画を維持
+        this.textCtx.imageSmoothingQuality = 'high'; // 高品質スムージング
+        this.textCtx.textRenderingOptimization = 'optimizeQuality'; // 品質優先
+        this.textCtx.lineCap = 'round'; // 滑らかな線端
+        this.textCtx.lineJoin = 'round'; // 滑らかな接続
+        this.textCtx.shadowColor = 'rgba(0,0,0,0)'; // シャドウは無効化
+        this.textCtx.shadowBlur = 0;
         
         // アニメーション時間オフセットを計算（非線形速度）
         let timeOffset = 0;
@@ -1312,6 +1332,15 @@ class GamingTextGenerator {
         console.log('=== drawGamingText 開始 ===');
         console.log('引数:', { text, x, y, animationMode, timeOffset, fontSize, isStretch });
         
+        // 完全にクリーンな描画のための初期設定
+        this.textCtx.shadowColor = 'transparent';
+        this.textCtx.shadowBlur = 0;
+        this.textCtx.shadowOffsetX = 0;
+        this.textCtx.shadowOffsetY = 0;
+        this.textCtx.globalCompositeOperation = 'source-over';
+        this.textCtx.imageSmoothingEnabled = false; // アンチエイリアス無効化
+        this.textCtx.textRenderingOptimization = 'optimizeSpeed';
+        
         // 改行対応
         const lines = text.split('\n');
         let lineHeight = fontSize * 1.2;
@@ -1336,25 +1365,20 @@ class GamingTextGenerator {
             }
         }
         
-        // フォント設定を更新（選択されたフォントを使用）
+        // フォント設定（太字オプション付き、黒縁なし）
         let selectedFont = this.textFont ? this.textFont.value : 'Arial';
         
-        // 小さいサイズでの最適フォント選択
+        // 小さいサイズでの最適化
         const canvasSize = Math.min(canvasWidth, canvasHeight);
         if (canvasSize <= 64 && actualFontSize <= 20) {
-            // 64x64以下かつ小フォントの場合、より鮮明なフォントに最適化
-            const originalFont = selectedFont;
-            if (selectedFont.includes('Gothic') || selectedFont.includes('gothic')) {
-                selectedFont = '"Hiragino Sans", "Yu Gothic UI", "Yu Gothic", YuGothic, "Meiryo UI", Meiryo, sans-serif';
-            } else if (selectedFont === 'Arial' || selectedFont.includes('sans-serif')) {
-                selectedFont = '"Segoe UI", "Helvetica Neue", Arial, sans-serif';
-            } else if (selectedFont.includes('serif')) {
-                selectedFont = '"Times New Roman", Times, serif';
-            }
-            console.log(`小サイズ用フォント最適化: ${originalFont} → ${selectedFont}`);
+            selectedFont = 'Arial'; // 小さいサイズでは基本フォントのみ
+            console.log(`小サイズ用基本フォント適用: ${selectedFont}`);
         }
         
-        this.textCtx.font = `bold ${actualFontSize}px ${selectedFont}`;
+        // 太字オプション（ユーザー選択可能）
+        const fontWeight = this.textBold && this.textBold.checked ? 'bold' : 'normal';
+        this.textCtx.font = `${fontWeight} ${actualFontSize}px ${selectedFont}`;
+        console.log(`フォント設定: ${this.textCtx.font}`);
         
         // テキストベースラインを正確に設定（ぴったりフィット用）
         if (isStretch) {
@@ -1364,14 +1388,16 @@ class GamingTextGenerator {
         }
         this.textCtx.textAlign = 'center';
         
-        // 小さいサイズでの追加最適化
+        // 小さいサイズでの高品質描画設定
         if (canvasSize <= 64) {
-            // より精密な描画設定
-            this.textCtx.fontKerning = 'auto';
+            // 高品質な描画のための設定
+            this.textCtx.fontKerning = 'auto'; // 自動カーニング
             this.textCtx.fontVariantCaps = 'normal';
             this.textCtx.fontStretch = 'normal';
-            this.textCtx.fontDisplay = 'block';
-            console.log(`小サイズ用描画設定適用: ${canvasSize}px`);
+            this.textCtx.fontDisplay = 'auto';
+            this.textCtx.imageSmoothingEnabled = true; // 小サイズでも高品質
+            this.textCtx.imageSmoothingQuality = 'high';
+            console.log(`小サイズ用高品質描画設定適用: ${canvasSize}px`);
         }
         
         lines.forEach((line, index) => {
@@ -1708,10 +1734,13 @@ class GamingTextGenerator {
             const normalizedTime = (timeOffset % 1 + 1) % 1; // 0-1の範囲で正規化
             const colorShift = normalizedTime * gamingColors.length; // 0-配列長の範囲
             
+            // グラデーション密度を取得（ユーザー設定）
+            const gradientDensity = this.textGradientDensity ? parseFloat(this.textGradientDensity.value) : 7;
+            
             for (let i = 0; i <= 10; i++) {
                 // 各グラデーション位置での色インデックスを計算
                 const position = i / 10; // 0-1の範囲
-                const colorFloat = (position * gamingColors.length + colorShift) % gamingColors.length;
+                const colorFloat = (position * gradientDensity + colorShift) % gamingColors.length;
                 
                 // 安全なインデックス計算
                 const colorIndex = Math.floor(Math.abs(colorFloat)) % gamingColors.length;
@@ -1740,18 +1769,10 @@ class GamingTextGenerator {
             }
             
             this.textCtx.fillStyle = gradient;
-            this.textCtx.strokeStyle = gradient;
-            this.textCtx.lineWidth = 2;
             
-            // 発光効果（グロー設定に応じて）
-            if (this.textGlow.checked) {
-                const currentColorIndex = Math.floor(Math.abs(colorShift)) % gamingColors.length;
-                this.textCtx.shadowColor = gamingColors[currentColorIndex];
-                this.textCtx.shadowBlur = 15;
-            } else {
-                this.textCtx.shadowColor = 'transparent';
-                this.textCtx.shadowBlur = 0;
-            }
+            // シャドウ効果を完全に無効化（クリーンな描画のため）
+            this.textCtx.shadowColor = 'transparent';
+            this.textCtx.shadowBlur = 0;
             
         } else if (animationMode === 'pulse') {
             // ベースカラーから白へのピカピカ点滅
@@ -1771,17 +1792,10 @@ class GamingTextGenerator {
             const blendedColor = this.blendColors(baseColor, '#FFFFFF', pulseIntensity);
             
             this.textCtx.fillStyle = blendedColor;
-            this.textCtx.strokeStyle = this.lightenColor(blendedColor, 20);
             
-            // 発光効果（グロー設定に応じて）
-            if (this.textGlow.checked) {
-                this.textCtx.shadowColor = blendedColor;
-                this.textCtx.shadowBlur = 15;
-            } else {
-                this.textCtx.shadowColor = 'transparent';
-                this.textCtx.shadowBlur = 0;
-            }
-            this.textCtx.lineWidth = 2;
+            // シャドウ効果を完全に無効化（クリーンな描画のため）
+            this.textCtx.shadowColor = 'transparent';
+            this.textCtx.shadowBlur = 0;
             
         } else if (animationMode === 'rainbowPulse') {
             // 虹色ピカピカ（単一色+アニメーション+パルス効果）
@@ -1834,19 +1848,10 @@ class GamingTextGenerator {
             
             // 単一色で塗りつぶし
             this.textCtx.fillStyle = pulsedColor;
-            this.textCtx.strokeStyle = this.lightenColor(pulsedColor, 20);
-            this.textCtx.lineWidth = 2;
             
-            // 発光効果（グロー設定に応じて）
-            if (this.textGlow.checked) {
-                // パルスに応じて発光の強さも変化
-                const glowIntensity = 10 + (Math.abs(pulse) * 10); // 10-20の範囲
-                this.textCtx.shadowColor = pulsedColor;
-                this.textCtx.shadowBlur = glowIntensity;
-            } else {
-                this.textCtx.shadowColor = 'transparent';
-                this.textCtx.shadowBlur = 0;
-            }
+            // シャドウ効果を完全に無効化（クリーンな描画のため）
+            this.textCtx.shadowColor = 'transparent';
+            this.textCtx.shadowBlur = 0;
 
         } else if (animationMode === 'bluepurplepink') {
             // シアン→青→紫→ピンク→赤寄りグラデーション
@@ -1910,10 +1915,13 @@ class GamingTextGenerator {
             const normalizedTime = (timeOffset % 1 + 1) % 1; // 0-1の範囲で正規化
             const colorShift = normalizedTime * gamingColors.length; // 0-配列長の範囲
             
+            // グラデーション密度を取得（ユーザー設定）
+            const gradientDensity2 = this.textGradientDensity ? parseFloat(this.textGradientDensity.value) : 7;
+            
             for (let i = 0; i <= 10; i++) {
                 // 各グラデーション位置での色インデックスを計算
                 const position = i / 10; // 0-1の範囲
-                const colorFloat = (position * gamingColors.length + colorShift) % gamingColors.length;
+                const colorFloat = (position * gradientDensity2 + colorShift) % gamingColors.length;
                 
                 // 安全なインデックス計算
                 const colorIndex = Math.floor(Math.abs(colorFloat)) % gamingColors.length;
@@ -1942,18 +1950,10 @@ class GamingTextGenerator {
             }
             
             this.textCtx.fillStyle = gradient;
-            this.textCtx.strokeStyle = gradient;
-            this.textCtx.lineWidth = 2;
             
-            // 発光効果（グロー設定に応じて）
-            if (this.textGlow.checked) {
-                const currentColorIndex = Math.floor(Math.abs(colorShift)) % gamingColors.length;
-                this.textCtx.shadowColor = gamingColors[currentColorIndex];
-                this.textCtx.shadowBlur = 15;
-            } else {
-                this.textCtx.shadowColor = 'transparent';
-                this.textCtx.shadowBlur = 0;
-            }
+            // シャドウ効果を完全に無効化（クリーンな描画のため）
+            this.textCtx.shadowColor = 'transparent';
+            this.textCtx.shadowBlur = 0;
         }
         
         // テキストを描画
@@ -1963,56 +1963,69 @@ class GamingTextGenerator {
             font: this.textCtx.font
         });
         
-        // 高品質テキスト描画設定
-        this.textCtx.imageSmoothingEnabled = true;
-        this.textCtx.imageSmoothingQuality = 'high';
+        // 高品質な描画のための設定
+        this.textCtx.imageSmoothingEnabled = true; // アンチエイリアス有効化
+        this.textCtx.imageSmoothingQuality = 'high'; // 高品質スムージング
+        this.textCtx.textRenderingOptimization = 'optimizeQuality'; // 品質優先描画
+        
+        // シャドウ設定を確実に無効化
+        this.textCtx.shadowColor = 'transparent';
+        this.textCtx.shadowBlur = 0;
+        this.textCtx.shadowOffsetX = 0;
+        this.textCtx.shadowOffsetY = 0;
         
         // 小さいフォントサイズの場合の特別な品質向上
         const fontSize = parseInt(this.textCtx.font.match(/\d+/)[0]) || 32;
         const canvasSize = Math.min(this.textCanvas.width, this.textCanvas.height);
         
         if (fontSize <= 24 || canvasSize <= 64) {
-            // 小さいフォント/小さいキャンバスでは高品質レンダリング最適化
-            this.textCtx.textRenderingOptimization = 'optimizeQuality';
-            this.textCtx.fontKerning = 'normal';
+            // 小さいフォント/小さいキャンバスでも高品質を維持
+            this.textCtx.textRenderingOptimization = 'optimizeQuality'; // 品質優先
+            this.textCtx.fontKerning = 'auto'; // 自動カーニング
             this.textCtx.fontVariantCaps = 'normal';
+            this.textCtx.imageSmoothingEnabled = true; // 小サイズでもスムージング
+            this.textCtx.imageSmoothingQuality = 'high'; // 高品質
             
-            // 小さいサイズ専用：線幅を細くして精細に
-            const originalLineWidth = this.textCtx.lineWidth;
-            if (this.textCtx.lineWidth > 1) {
-                if (canvasSize <= 32) {
-                    this.textCtx.lineWidth = Math.max(0.3, this.textCtx.lineWidth * 0.5); // 32px以下はさらに細く
-                } else if (canvasSize <= 64) {
-                    this.textCtx.lineWidth = Math.max(0.5, this.textCtx.lineWidth * 0.7); // 64px以下は細く
-                }
-            }
-            
-            // 小さいサイズ専用：シャドウを控えめに
-            const originalShadowBlur = this.textCtx.shadowBlur;
-            if (this.textCtx.shadowBlur > 0) {
-                if (canvasSize <= 32) {
-                    this.textCtx.shadowBlur = Math.max(0.5, this.textCtx.shadowBlur * 0.3); // 32px以下はほぼ無し
-                } else if (canvasSize <= 64) {
-                    this.textCtx.shadowBlur = Math.max(1, this.textCtx.shadowBlur * 0.5); // 64px以下は控えめ
-                }
-            }
-            
-            // 座標の精度向上（ピクセル境界に合わせる）
-            this.textCtx.translate(0.5, 0.5);
-            
-            console.log(`小サイズ用フォント最適化適用 - fontSize: ${fontSize}, canvasSize: ${canvasSize}, lineWidth: ${originalLineWidth}→${this.textCtx.lineWidth}, shadowBlur: ${originalShadowBlur}→${this.textCtx.shadowBlur}`);
+            console.log(`小サイズ用高品質描画適用 - fontSize: ${fontSize}, canvasSize: ${canvasSize}`);
         }
         
-        // テキスト描画（フィル→ストロークの順序で高品質に）
-        this.textCtx.fillText(line, x, currentY);
-        this.textCtx.strokeText(line, x, currentY);
-        console.log('テキスト描画完了');
+        // 描画直前の高品質設定（太字対応、品質保持）
+        this.textCtx.save(); // 現在の状態を保存
         
-        // 小さいサイズでの座標変換をリセット
-        const currentCanvasSize = Math.min(this.textCanvas.width, this.textCanvas.height);
-        if ((fontSize <= 24 || currentCanvasSize <= 64) && (currentCanvasSize <= 64)) {
-            this.textCtx.translate(-0.5, -0.5); // 座標変換をリセット
+        // シャドウのみ無効化、その他は高品質維持
+        this.textCtx.shadowColor = 'rgba(0,0,0,0)';
+        this.textCtx.shadowBlur = 0;
+        this.textCtx.shadowOffsetX = 0;
+        this.textCtx.shadowOffsetY = 0;
+        this.textCtx.imageSmoothingEnabled = true; // 高品質スムージング維持
+        this.textCtx.imageSmoothingQuality = 'high';
+        this.textCtx.textRenderingOptimization = 'optimizeQuality'; // 品質優先
+        this.textCtx.globalCompositeOperation = 'source-over';
+        this.textCtx.lineCap = 'round'; // 滑らかな線端
+        this.textCtx.lineJoin = 'round'; // 滑らかな接続
+        
+        // 太字フォント使用時の設定
+        const isBold = this.textBold && this.textBold.checked;
+        if (isBold) {
+            // 太字時も品質優先を維持
+            this.textCtx.globalCompositeOperation = 'source-over';
+            this.textCtx.textRenderingOptimization = 'optimizeQuality';
+            console.log('太字モード：高品質描画適用');
         }
+        
+        // フォントレンダリングの詳細設定
+        this.textCtx.textBaseline = this.textCtx.textBaseline; // 現在の設定を維持
+        this.textCtx.textAlign = this.textCtx.textAlign; // 現在の設定を維持
+        
+        // 座標を整数に丸めてピクセル境界に正確に配置（黒縁除去）
+        const roundedX = Math.round(x);
+        const roundedY = Math.round(currentY);
+        
+        // テキスト描画（完全にクリーンな塗りつぶしのみ）
+        this.textCtx.fillText(line, roundedX, roundedY);
+        
+        this.textCtx.restore(); // 状態を復元
+        console.log('高品質テキスト描画完了 - 座標:', roundedX, roundedY, '太字:', isBold);
     }
 
     drawGamingImage(image, animationMode, timeOffset) {
@@ -2093,6 +2106,9 @@ class GamingTextGenerator {
             // グラデーション方向を取得
             const direction = this.textGradientDirection ? this.textGradientDirection.value : 'horizontal';
             
+            // グラデーション密度を取得
+            const gradientDensity = this.gradientDensity ? parseFloat(this.gradientDensity.value) : 7;
+            
             for (let i = 0; i < data.length; i += 4) {
                 const pixelIndex = i / 4;
                 const x = pixelIndex % sourceCanvas.width;
@@ -2119,7 +2135,8 @@ class GamingTextGenerator {
                         position = x / sourceCanvas.width; // デフォルトは横方向
                 }
                 
-                const colorFloat = (position * gamingColors.length + colorShift) % gamingColors.length;
+                // グラデーション密度を適用
+                const colorFloat = (position * gamingColors.length * gradientDensity + colorShift) % gamingColors.length;
                 const colorIndex = Math.floor(Math.abs(colorFloat)) % gamingColors.length;
                 const nextColorIndex = (colorIndex + 1) % gamingColors.length;
                 const blend = Math.max(0, Math.min(1, colorFloat - Math.floor(colorFloat))); // 0-1の範囲に確実に制限
@@ -2389,6 +2406,9 @@ class GamingTextGenerator {
             // グラデーション方向を取得
             const direction = this.textGradientDirection ? this.textGradientDirection.value : 'horizontal';
             
+            // グラデーション密度を取得
+            const gradientDensity = this.gradientDensity ? parseFloat(this.gradientDensity.value) : 7;
+            
             for (let i = 0; i < data.length; i += 4) {
                 const pixelIndex = i / 4;
                 const x = pixelIndex % sourceCanvas.width;
@@ -2415,7 +2435,8 @@ class GamingTextGenerator {
                         position = x / sourceCanvas.width; // デフォルトは横方向
                 }
                 
-                const colorFloat = (position * gamingColors.length + colorShift) % gamingColors.length;
+                // グラデーション密度を適用
+                const colorFloat = (position * gamingColors.length * gradientDensity + colorShift) % gamingColors.length;
                 const colorIndex = Math.floor(Math.abs(colorFloat)) % gamingColors.length;
                 const nextColorIndex = (colorIndex + 1) % gamingColors.length;
                 const blend = Math.max(0, Math.min(1, colorFloat - Math.floor(colorFloat))); // 0-1の範囲に確実に制限
