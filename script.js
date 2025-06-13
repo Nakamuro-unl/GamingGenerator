@@ -2107,7 +2107,7 @@ class GamingTextGenerator {
             const direction = this.textGradientDirection ? this.textGradientDirection.value : 'horizontal';
             
             // グラデーション密度を取得
-            const gradientDensity = this.gradientDensity ? parseFloat(this.gradientDensity.value) : 7;
+            const gradientDensity = this.textGradientDensity ? parseFloat(this.textGradientDensity.value) : 7;
             
             for (let i = 0; i < data.length; i += 4) {
                 const pixelIndex = i / 4;
@@ -2135,8 +2135,8 @@ class GamingTextGenerator {
                         position = x / sourceCanvas.width; // デフォルトは横方向
                 }
                 
-                // グラデーション密度を適用
-                const colorFloat = (position * gamingColors.length * gradientDensity + colorShift) % gamingColors.length;
+                // グラデーション密度を適用（テキストと同じ計算方式）
+                const colorFloat = (position * gradientDensity + colorShift) % gamingColors.length;
                 const colorIndex = Math.floor(Math.abs(colorFloat)) % gamingColors.length;
                 const nextColorIndex = (colorIndex + 1) % gamingColors.length;
                 const blend = Math.max(0, Math.min(1, colorFloat - Math.floor(colorFloat))); // 0-1の範囲に確実に制限
@@ -2155,74 +2155,28 @@ class GamingTextGenerator {
                 ];
                 
                 if (data[i + 3] > 0) { // 透明でないピクセルのみ
-                    // 元画像の色を取得
+                    // 元画像の明度を保持しながら、ブレンド色を適用（明度改善版）
                     const originalR = data[i];
                     const originalG = data[i + 1];
                     const originalB = data[i + 2];
                     
-                    // 元画像のRGBをHSLに変換
-                    const originalHSL = this.rgbToHsl(originalR, originalG, originalB);
+                    // 元画像の明度を計算（下限を設定して暗くなりすぎないようにする）
+                    const originalLuminance = (originalR * 0.299 + originalG * 0.587 + originalB * 0.114) / 255;
+                    const adjustedLuminance = Math.max(0.3, Math.min(1.0, originalLuminance * 1.4)); // 明度を40%向上＋下限30%
                     
-                    // 元の色相をベースに色相シフトを適用
-                    let newHue = originalHSL[0]; // 元の色相
+                    // ブレンド色に調整された明度を適用
+                    const targetR = blendedColor[0] * adjustedLuminance;
+                    const targetG = blendedColor[1] * adjustedLuminance;
+                    const targetB = blendedColor[2] * adjustedLuminance;
                     
-                    // グラデーション方向に応じた位置計算
-                    const pixelIndex = i / 4;
-                    const x = pixelIndex % sourceCanvas.width;
-                    const y = Math.floor(pixelIndex / sourceCanvas.width);
+                    // 彩度レベルを適用
+                    const finalR = targetR * saturationLevel + originalR * (1 - saturationLevel);
+                    const finalG = targetG * saturationLevel + originalG * (1 - saturationLevel);
+                    const finalB = targetB * saturationLevel + originalB * (1 - saturationLevel);
                     
-                    const direction = this.textGradientDirection ? this.textGradientDirection.value : 'horizontal';
-                    let position;
-                    switch (direction) {
-                        case 'horizontal':
-                            position = x / sourceCanvas.width;
-                            break;
-                        case 'vertical':
-                            position = y / sourceCanvas.height;
-                            break;
-                        case 'diagonal1':
-                            position = (x / sourceCanvas.width + y / sourceCanvas.height) / 2;
-                            break;
-                        case 'diagonal2':
-                            position = ((sourceCanvas.width - x) / sourceCanvas.width + y / sourceCanvas.height) / 2;
-                            break;
-                        default:
-                            position = x / sourceCanvas.width;
-                    }
-                    
-                    // 時間とポジションに基づいて色相をシフト
-                    const hueShift = (timeOffset * 2 + position * 2) % 1; // 0-1の範囲
-                    newHue = (originalHSL[0] + hueShift) % 1;
-                    
-                    // 彩度を調整（元の彩度をベースに強化）
-                    let newSaturation = originalHSL[1];
-                    if (newSaturation < 0.3) {
-                        // 元々彩度が低い部分は適度に強化
-                        newSaturation = Math.min(0.8, newSaturation + 0.4) * saturationLevel;
-                    } else {
-                        // 元々彩度がある部分は元の値を活かしつつ調整
-                        newSaturation = Math.min(1.0, newSaturation * 1.2) * saturationLevel;
-                    }
-                    
-                    // 明度を適度に調整（元の明暗を保持）
-                    let newLightness = originalHSL[2];
-                    if (originalHSL[2] < 0.2) {
-                        // 暗い部分は少し明るく
-                        newLightness = Math.min(0.6, originalHSL[2] * 1.5);
-                    } else if (originalHSL[2] > 0.8) {
-                        // 明るい部分は少し抑制
-                        newLightness = Math.max(0.4, originalHSL[2] * 0.9);
-                    } else {
-                        // 中間の明度は元の値を活かす
-                        newLightness = originalHSL[2];
-                    }
-                    
-                    // HSLからRGBに変換
-                    const newRGB = this.hslToRgb(newHue, newSaturation, newLightness);
-                    
-                    data[i] = Math.max(0, Math.min(255, Math.round(newRGB[0])));     // R
-                    data[i + 1] = Math.max(0, Math.min(255, Math.round(newRGB[1]))); // G
-                    data[i + 2] = Math.max(0, Math.min(255, Math.round(newRGB[2]))); // B
+                    data[i] = Math.max(0, Math.min(255, Math.round(finalR)));     // R
+                    data[i + 1] = Math.max(0, Math.min(255, Math.round(finalG))); // G
+                    data[i + 2] = Math.max(0, Math.min(255, Math.round(finalB))); // B
                 }
             }
             
@@ -2407,7 +2361,7 @@ class GamingTextGenerator {
             const direction = this.textGradientDirection ? this.textGradientDirection.value : 'horizontal';
             
             // グラデーション密度を取得
-            const gradientDensity = this.gradientDensity ? parseFloat(this.gradientDensity.value) : 7;
+            const gradientDensity = this.textGradientDensity ? parseFloat(this.textGradientDensity.value) : 7;
             
             for (let i = 0; i < data.length; i += 4) {
                 const pixelIndex = i / 4;
@@ -2435,8 +2389,8 @@ class GamingTextGenerator {
                         position = x / sourceCanvas.width; // デフォルトは横方向
                 }
                 
-                // グラデーション密度を適用
-                const colorFloat = (position * gamingColors.length * gradientDensity + colorShift) % gamingColors.length;
+                // グラデーション密度を適用（テキストと同じ計算方式）
+                const colorFloat = (position * gradientDensity + colorShift) % gamingColors.length;
                 const colorIndex = Math.floor(Math.abs(colorFloat)) % gamingColors.length;
                 const nextColorIndex = (colorIndex + 1) % gamingColors.length;
                 const blend = Math.max(0, Math.min(1, colorFloat - Math.floor(colorFloat))); // 0-1の範囲に確実に制限
@@ -2455,63 +2409,28 @@ class GamingTextGenerator {
                 ];
                 
                 if (data[i + 3] > 0) { // 透明でないピクセルのみ
-                    // 元画像の色を取得
+                    // 元画像の明度を保持しながら、ブレンド色を適用（明度改善版）
                     const originalR = data[i];
                     const originalG = data[i + 1];
                     const originalB = data[i + 2];
                     
-                    // 元画像のRGBをHSLに変換
-                    const originalHSL = this.rgbToHsl(originalR, originalG, originalB);
+                    // 元画像の明度を計算（下限を設定して暗くなりすぎないようにする）
+                    const originalLuminance = (originalR * 0.299 + originalG * 0.587 + originalB * 0.114) / 255;
+                    const adjustedLuminance = Math.max(0.3, Math.min(1.0, originalLuminance * 1.4)); // 明度を40%向上＋下限30%
                     
-                    // ブレンド色から基準色相を取得（青→紫→ピンクの範囲）
-                    const targetHSL = this.rgbToHsl(blendedColor[0], blendedColor[1], blendedColor[2]);
+                    // ブレンド色に調整された明度を適用
+                    const targetR = blendedColor[0] * adjustedLuminance;
+                    const targetG = blendedColor[1] * adjustedLuminance;
+                    const targetB = blendedColor[2] * adjustedLuminance;
                     
-                    // 元の色相をベースに、青→紫→ピンクの範囲で色相をシフト
-                    let newHue = originalHSL[0]; // 元の色相
+                    // 彩度レベルを適用
+                    const finalR = targetR * saturationLevel + originalR * (1 - saturationLevel);
+                    const finalG = targetG * saturationLevel + originalG * (1 - saturationLevel);
+                    const finalB = targetB * saturationLevel + originalB * (1 - saturationLevel);
                     
-                    // 時間とポジションに基づいて色相をシフト（シアン→青→紫→ピンク→赤寄りの範囲内）
-                    const baseHue = 180 / 360; // シアンの色相（0-1の範囲）
-                    const hueRange = 160 / 360; // 160°の色相範囲（シアンから赤寄りピンクまで）
-                    const hueShift = (timeOffset * 2 + position * 2) % 1; // 0-1の範囲
-                    
-                    // シアン→青→紫→ピンク→赤寄りの範囲内での色相を計算
-                    let targetHueInRange = (baseHue + hueRange * hueShift);
-                    if (targetHueInRange >= 1) targetHueInRange -= 1; // 0-1の範囲に正規化
-                    
-                    // 元の色相と目標色相をブレンド（シアン→青→紫→ピンク→赤寄りの影響を適用）
-                    const hueBlend = 0.7; // グラデーションの影響度
-                    newHue = (originalHSL[0] * (1 - hueBlend) + targetHueInRange * hueBlend);
-                    if (newHue >= 1) newHue -= 1; // 0-1の範囲に正規化
-                    
-                    // 彩度を調整（元の彩度をベースに強化）
-                    let newSaturation = originalHSL[1];
-                    if (newSaturation < 0.3) {
-                        // 元々彩度が低い部分は適度に強化
-                        newSaturation = Math.min(0.8, newSaturation + 0.4) * saturationLevel;
-                    } else {
-                        // 元々彩度がある部分は元の値を活かしつつ調整
-                        newSaturation = Math.min(1.0, newSaturation * 1.2) * saturationLevel;
-                    }
-                    
-                    // 明度を適度に調整（元の明暗を保持）
-                    let newLightness = originalHSL[2];
-                    if (originalHSL[2] < 0.2) {
-                        // 暗い部分は少し明るく
-                        newLightness = Math.min(0.6, originalHSL[2] * 1.5);
-                    } else if (originalHSL[2] > 0.8) {
-                        // 明るい部分は少し抑制
-                        newLightness = Math.max(0.4, originalHSL[2] * 0.9);
-                    } else {
-                        // 中間の明度は元の値を活かす
-                        newLightness = originalHSL[2];
-                    }
-                    
-                    // HSLからRGBに変換
-                    const newRGB = this.hslToRgb(newHue, newSaturation, newLightness);
-                    
-                    data[i] = Math.max(0, Math.min(255, Math.round(newRGB[0])));     // R
-                    data[i + 1] = Math.max(0, Math.min(255, Math.round(newRGB[1]))); // G
-                    data[i + 2] = Math.max(0, Math.min(255, Math.round(newRGB[2]))); // B
+                    data[i] = Math.max(0, Math.min(255, Math.round(finalR)));     // R
+                    data[i + 1] = Math.max(0, Math.min(255, Math.round(finalG))); // G
+                    data[i + 2] = Math.max(0, Math.min(255, Math.round(finalB))); // B
                 }
             }
         }
