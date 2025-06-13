@@ -94,6 +94,45 @@ body.dark-mode .header-section {
     background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
 }
 
+/* 注意書きセクション */
+.notice-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    margin: 0 15px 20px 15px;
+    padding: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.notice-content {
+    color: white;
+    text-align: center;
+}
+
+.notice-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin: 0 0 10px 0;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.notice-text {
+    font-size: 0.9em;
+    line-height: 1.5;
+    margin: 0;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.notice-text strong {
+    font-weight: bold;
+    text-shadow: 2px 2px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* ダークモード対応 */
+body.dark-mode .notice-section {
+    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+    border: 1px solid #4a5568;
+}
+
 .upload-section {
     padding: 15px;
     text-align: center;
@@ -749,10 +788,10 @@ body.dark-mode .slack-mode-item span {
     display: none;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1200px) and (min-width: 769px) {
     .tab-content.active {
         flex-direction: column;
-        gap: 10px;
+        gap: 15px;
     }
     
     .controls-area,
@@ -761,8 +800,31 @@ body.dark-mode .slack-mode-item span {
         flex: none;
     }
     
+    /* タブレット：プレビューエリアを上部に配置 */
     .preview-area {
+        order: -1;
         position: static;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        padding: 15px;
+        margin-bottom: 10px;
+    }
+    
+    /* ダークモード時のタブレットプレビューエリア */
+    body.dark-mode .preview-area {
+        background: #2a2a3e;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* タブレット：キャンバスサイズ調整 */
+    #canvas, #textCanvas {
+        max-width: 100%;
+        max-height: 60vh;
+    }
+    
+    .controls-area {
+        order: 1;
     }
 }
 
@@ -801,8 +863,54 @@ body.dark-mode .slack-mode-item span {
         padding: 5px;
     }
     
+    /* モバイル専用：タブコンテンツレイアウト調整 */
     .tab-content.active {
-        gap: 8px;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    /* モバイル専用：集中線ジェネレーターのレイアウト最適化 */
+    #concentration.tab-content.active {
+        display: block;
+    }
+    
+    /* モバイル専用：プレビューエリアを上部に固定表示 */
+    .preview-area {
+        order: -1;
+        position: sticky;
+        top: 10px;
+        z-index: 10;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        margin-bottom: 15px;
+    }
+    
+    /* ダークモード時のプレビューエリア */
+    body.dark-mode .preview-area {
+        background: #2a2a3e;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* モバイル専用：キャンバスサイズ調整 */
+    #canvas {
+        max-width: 100%;
+        max-height: 40vh;
+        width: auto;
+        height: auto;
+    }
+    
+    /* モバイル専用：テキストキャンバスサイズ調整 */
+    #textCanvas {
+        max-width: 100%;
+        max-height: 40vh;
+        width: auto;
+        height: auto;
+    }
+    
+    /* モバイル専用：コントロールエリアの改善 */
+    .controls-area {
+        order: 1;
     }
     
     /* プレビューセクションのモバイル対応 */
@@ -839,6 +947,21 @@ body.dark-mode .slack-mode-item span {
     #lightCanvas, #darkCanvas {
         max-width: 80px;
     }
+    
+    /* モバイル専用：注意書きセクションの調整 */
+    .notice-section {
+        margin: 0 5px 15px 5px;
+        padding: 10px;
+    }
+    
+    .notice-title {
+        font-size: 1.1em;
+    }
+    
+    .notice-text {
+        font-size: 0.85em;
+        line-height: 1.4;
+    }
 }
 
 /* ダークモード時のその他の要素 */
@@ -861,6 +984,64 @@ body.dark-mode #textCanvas {
 
 body.dark-mode .control-group span {
     color: #8bb6ff;
+}
+
+/* 超小画面（スマートフォン縦向き）対応 */
+@media (max-width: 480px) {
+    .container {
+        padding: 3px;
+        margin: 5px;
+    }
+    
+    h1 {
+        font-size: 1.5em;
+    }
+    
+    .notice-section {
+        margin: 0 3px 10px 3px;
+        padding: 8px;
+    }
+    
+    .notice-title {
+        font-size: 1em;
+    }
+    
+    .notice-text {
+        font-size: 0.8em;
+    }
+    
+    .tab-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+    
+    .preview-area {
+        margin-bottom: 10px;
+        padding: 8px;
+    }
+    
+    #canvas, #textCanvas {
+        max-height: 35vh;
+    }
+    
+    .controls-section, .text-controls-section {
+        padding: 8px;
+        gap: 8px;
+    }
+    
+    .control-group {
+        padding: 8px;
+    }
+    
+    .control-group label {
+        font-size: 12px;
+    }
+    
+    button {
+        padding: 6px 12px;
+        font-size: 12px;
+        margin: 3px;
+    }
 }
 
 /* フッター */
