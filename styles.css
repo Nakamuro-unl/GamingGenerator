@@ -874,28 +874,27 @@ body.dark-mode .slack-mode-item span {
         display: block;
     }
     
-    /* モバイル専用：プレビューエリアを上部に固定表示 */
+    /* モバイル専用：プレビューエリアをコンパクトに上部配置 */
     .preview-area {
         order: -1;
-        position: sticky;
-        top: 10px;
-        z-index: 10;
+        position: static;
         background: white;
         border-radius: 10px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        margin-bottom: 15px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 10px;
+        padding: 10px;
     }
     
     /* ダークモード時のプレビューエリア */
     body.dark-mode .preview-area {
         background: #2a2a3e;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
     
     /* モバイル専用：キャンバスサイズ調整 */
     #canvas {
         max-width: 100%;
-        max-height: 40vh;
+        max-height: 30vh;
         width: auto;
         height: auto;
     }
@@ -903,9 +902,20 @@ body.dark-mode .slack-mode-item span {
     /* モバイル専用：テキストキャンバスサイズ調整 */
     #textCanvas {
         max-width: 100%;
-        max-height: 40vh;
+        max-height: 30vh;
         width: auto;
         height: auto;
+    }
+    
+    /* モバイル専用：プレビュー情報をよりコンパクトに */
+    .preview-info {
+        margin-bottom: 5px;
+        padding: 8px;
+    }
+    
+    .preview-info p {
+        font-size: 11px;
+        margin: 2px 0;
     }
     
     /* モバイル専用：コントロールエリアの改善 */
@@ -1021,7 +1031,16 @@ body.dark-mode .control-group span {
     }
     
     #canvas, #textCanvas {
-        max-height: 35vh;
+        max-height: 25vh;
+    }
+    
+    .preview-info {
+        padding: 6px;
+    }
+    
+    .preview-info p {
+        font-size: 10px;
+        margin: 1px 0;
     }
     
     .controls-section, .text-controls-section {
