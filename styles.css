@@ -870,7 +870,7 @@ body.dark-mode .slack-mode-item span {
     }
     
     /* モバイル専用：集中線ジェネレーターのレイアウト最適化 */
-    #concentration.tab-content.active {
+    #concentration-tab.tab-content.active {
         display: block;
     }
     
