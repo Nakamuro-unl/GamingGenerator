@@ -3093,6 +3093,14 @@ class GamingTextGenerator {
         this.textDownloadGifBtn.disabled = true;
         
         try {
+            // 画像モードの場合はVercel APIを使用
+            if (this.creationMode === 'image' && this.gifFrames && this.gifFrames.length > 0 && this.gifFrames[0].originalFile) {
+                console.log('🌐 Vercel API でGIF処理を開始...');
+                await this.processGifWithVercelAPI();
+                return;
+            }
+            
+            // テキストモードの場合は従来の方法
             await this.captureFramesForGif();
             
             const gifOptions = {
@@ -3198,6 +3206,90 @@ class GamingTextGenerator {
             this.textDownloadGifBtn.textContent = 'GIFで保存';
             this.textDownloadGifBtn.disabled = false;
         }
+    }
+
+    // Vercel APIでGIF処理を行う
+    async processGifWithVercelAPI() {
+        const originalFile = this.gifFrames[0].originalFile;
+        
+        try {
+            // GIFファイルをBase64に変換
+            const base64Data = await this.fileToBase64(originalFile);
+            
+            // 設定を取得
+            const settings = {
+                animationType: this.textAnimationMode.value,
+                speed: parseInt(this.textAnimationSpeed.value) || 5,
+                saturation: parseInt(this.textSaturation.value) || 100
+            };
+            
+            this.textDownloadGifBtn.textContent = 'サーバー処理中...';
+            
+            // Vercel APIを呼び出し
+            const response = await fetch('https://your-vercel-app.vercel.app/api/gif-gaming', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gifData: base64Data,
+                    settings: settings
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status} ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'API処理に失敗しました');
+            }
+            
+            console.log(`✅ GIF処理完了: ${result.frameCount}フレーム, サイズ: ${result.size}bytes`);
+            
+            // 結果をダウンロード
+            const blob = this.base64ToBlob(result.gifData);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'gaming_gif_' + new Date().getTime() + '.gif';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            this.textDownloadGifBtn.textContent = 'GIFで保存';
+            this.textDownloadGifBtn.disabled = false;
+            
+        } catch (error) {
+            console.error('❌ Vercel API エラー:', error);
+            alert(`GIF処理に失敗しました。\nエラー: ${error.message}`);
+            this.textDownloadGifBtn.textContent = 'GIFで保存';
+            this.textDownloadGifBtn.disabled = false;
+        }
+    }
+    
+    // ファイルをBase64に変換
+    fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+    
+    // Base64をBlobに変換
+    base64ToBlob(base64Data) {
+        const byteCharacters = atob(base64Data.split(',')[1]);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        return new Blob([byteArray], {type: 'image/gif'});
     }
 
     // 完璧なループのための最適フレーム数を自動計算（テキスト用）
