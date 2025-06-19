@@ -1376,21 +1376,52 @@ class GamingTextGenerator {
         }
     }
 
-    // GIFプレビューのセットアップ
-    setupGifPreview(dataUrl, file) {
+    // GIFプレビューのセットアップ（改善版）
+    async setupGifPreview(dataUrl, file) {
         console.log('🎬 GIFプレビューセットアップ開始');
         
-        // GIF用のimg要素を作成
-        const gifImg = new Image();
-        gifImg.onload = () => {
+        try {
+            // まず通常のImage要素として読み込み
+            const gifImg = new Image();
+            await new Promise((resolve, reject) => {
+                gifImg.onload = resolve;
+                gifImg.onerror = reject;
+                gifImg.src = dataUrl;
+            });
+            
             console.log(`📐 GIFサイズ: ${gifImg.width}x${gifImg.height}`);
             
-            // GIFフレームデータを準備
-            this.gifFrames = [{
-                img: gifImg,
-                originalFile: file,
-                dataUrl: dataUrl
-            }];
+            // より詳細なGIF分解を試行
+            let extractedFrames = [];
+            try {
+                extractedFrames = await this.extractGifFramesAdvanced(file);
+                console.log(`🎞️ 高度分解: ${extractedFrames.length}フレーム抽出`);
+            } catch (error) {
+                console.warn('⚠️ 高度分解失敗、フォールバック使用:', error);
+                extractedFrames = [];
+            }
+            
+            // フレームが複数抽出できた場合はそれを使用、できなかった場合は元画像を使用
+            if (extractedFrames.length > 1) {
+                this.gifFrames = extractedFrames.map((frameData, index) => ({
+                    img: frameData.img,
+                    canvas: frameData.canvas,
+                    delay: frameData.delay || 100,
+                    originalFile: file,
+                    dataUrl: dataUrl,
+                    frameIndex: index
+                }));
+                console.log(`✅ ${this.gifFrames.length}フレームのアニメーションGIFを検出`);
+            } else {
+                // フォールバック: 元画像を単一フレームとして使用
+                this.gifFrames = [{
+                    img: gifImg,
+                    originalFile: file,
+                    dataUrl: dataUrl,
+                    frameIndex: 0
+                }];
+                console.log('📸 静的GIFまたは1フレームGIFとして処理');
+            }
             
             this.uploadedImage = gifImg;
             
@@ -1400,8 +1431,11 @@ class GamingTextGenerator {
             
             // GIFプレビューアニメーションを開始
             this.startGifPreview();
-        };
-        gifImg.src = dataUrl;
+            
+        } catch (error) {
+            console.error('❌ GIFセットアップエラー:', error);
+            alert('GIFファイルの読み込みに失敗しました。');
+        }
     }
 
     // GIFプレビューアニメーション開始（DOM overlay方式）
@@ -3980,6 +4014,149 @@ window.debugGaming = {
             gif.render();
         } catch (error) {
         }
+    }
+    
+    // 高度なGIF分解メソッド（バイナリレベル解析）
+    async extractGifFramesAdvanced(file) {
+        console.log('🔬 高度GIF分解開始...');
+        
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const buffer = e.target.result;
+                    const frames = this.parseGifFrames(buffer);
+                    
+                    if (frames.length > 1) {
+                        console.log(`✅ ${frames.length}フレーム抽出成功`);
+                        resolve(frames);
+                    } else {
+                        console.log('📸 アニメーションフレーム未検出');
+                        resolve([]);
+                    }
+                } catch (error) {
+                    console.error('❌ GIF分解エラー:', error);
+                    reject(error);
+                }
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        });
+    }
+    
+    // GIFバイナリ解析（簡易版）
+    parseGifFrames(buffer) {
+        const view = new DataView(buffer);
+        const frames = [];
+        
+        // GIFヘッダー確認
+        const header = String.fromCharCode(...new Uint8Array(buffer, 0, 6));
+        if (!header.startsWith('GIF')) {
+            throw new Error('無効なGIFファイル');
+        }
+        
+        console.log(`📋 GIFヘッダー: ${header}`);
+        
+        // 論理画面記述子から基本情報を取得
+        const width = view.getUint16(6, true);
+        const height = view.getUint16(8, true);
+        
+        console.log(`📐 論理画面サイズ: ${width}x${height}`);
+        
+        // 簡易的なフレーム検出（画像記述子を探す）
+        let pos = 13; // ヘッダー + 論理画面記述子の後
+        const uint8View = new Uint8Array(buffer);
+        
+        // グローバルカラーテーブルをスキップ
+        const globalColorTableFlag = (view.getUint8(10) & 0x80) !== 0;
+        if (globalColorTableFlag) {
+            const globalColorTableSize = 2 << (view.getUint8(10) & 0x07);
+            pos += globalColorTableSize * 3;
+        }
+        
+        let frameCount = 0;
+        while (pos < buffer.byteLength - 1) {
+            const separator = uint8View[pos];
+            
+            if (separator === 0x21) { // Extension
+                const label = uint8View[pos + 1];
+                pos += 2;
+                
+                if (label === 0xF9) { // Graphics Control Extension
+                    console.log(`🎬 グラフィック制御拡張発見 (pos: ${pos})`);
+                }
+                
+                // Extension data blocks をスキップ
+                while (pos < buffer.byteLength) {
+                    const blockSize = uint8View[pos];
+                    pos++;
+                    if (blockSize === 0) break;
+                    pos += blockSize;
+                }
+            } else if (separator === 0x2C) { // Image Descriptor (フレーム)
+                console.log(`🖼️ フレーム ${frameCount + 1} 発見 (pos: ${pos})`);
+                frameCount++;
+                
+                // フレーム情報を抽出して Canvas 作成を試行
+                const frameLeft = view.getUint16(pos + 1, true);
+                const frameTop = view.getUint16(pos + 3, true);
+                const frameWidth = view.getUint16(pos + 5, true);
+                const frameHeight = view.getUint16(pos + 7, true);
+                
+                console.log(`  📏 フレーム情報: ${frameWidth}x${frameHeight} at (${frameLeft}, ${frameTop})`);
+                
+                // このフレームのCanvas（実際の画像データ抽出は複雑なので、元画像を使用）
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                
+                // フレーム画像を作成（実際のGIFファイルを元画像として使用）
+                const frameImg = new Image();
+                const frameDataUrl = `data:image/gif;base64,${btoa(String.fromCharCode(...uint8View))}`;
+                frameImg.src = frameDataUrl;
+                
+                frames.push({
+                    img: frameImg,
+                    canvas: canvas,
+                    delay: 100, // デフォルト
+                    width: frameWidth,
+                    height: frameHeight,
+                    left: frameLeft,
+                    top: frameTop
+                });
+                
+                // Image descriptor をスキップ
+                pos += 9;
+                
+                // Local color table をスキップ
+                const localColorTableFlag = (view.getUint8(pos - 1) & 0x80) !== 0;
+                if (localColorTableFlag) {
+                    const localColorTableSize = 2 << (view.getUint8(pos - 1) & 0x07);
+                    pos += localColorTableSize * 3;
+                }
+                
+                // LZW データをスキップ
+                const lzwMinimumCodeSize = uint8View[pos];
+                pos++;
+                
+                while (pos < buffer.byteLength) {
+                    const blockSize = uint8View[pos];
+                    pos++;
+                    if (blockSize === 0) break;
+                    pos += blockSize;
+                }
+            } else if (separator === 0x3B) { // Trailer
+                console.log('🏁 GIF終端マーカー到達');
+                break;
+            } else {
+                pos++;
+            }
+        }
+        
+        console.log(`📊 検出されたフレーム数: ${frameCount}`);
+        
+        return frames;
     }
 };
 

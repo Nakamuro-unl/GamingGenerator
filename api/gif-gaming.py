@@ -52,52 +52,43 @@ def handler(request):
         frames = []
         durations = []
         
-        # より簡単で確実なGIFフレーム抽出（イテレーター使用）
+        # より確実なGIFフレーム抽出（複数の方法を試行）
         try:
             print(f"📐 GIFサイズ: {gif_image.width}x{gif_image.height}")
             print(f"🔍 GIF情報: format={gif_image.format}, mode={gif_image.mode}")
             print(f"🎬 is_animated: {getattr(gif_image, 'is_animated', False)}")
             print(f"📈 n_frames: {getattr(gif_image, 'n_frames', 1)}")
             
-            # フレーム数を確認
+            # フレーム数を確認（複数の方法を試行）
             total_frames = getattr(gif_image, 'n_frames', 1)
+            
+            # アニメーションGIFでない場合も適切に処理
+            if not getattr(gif_image, 'is_animated', False):
+                print("📸 静的GIFとして検出")
+                total_frames = 1
+            
             print(f"📊 総フレーム数: {total_frames}")
             
-            # 各フレームを順次処理
-            for frame_index in range(total_frames):
+            # フレーム抽出方法1: 標準的な方法
+            if total_frames > 1:
+                print("🔬 方法1: 標準フレーム抽出")
+                frames, durations = extract_frames_method1(gif_image, total_frames)
+            
+            # フレーム抽出が失敗した場合は方法2を試行
+            if len(frames) <= 1 and total_frames > 1:
+                print("🔬 方法2: 代替フレーム抽出")
                 try:
-                    # フレームにシーク
-                    gif_image.seek(frame_index)
-                    
-                    # フレーム情報を取得
-                    duration = gif_image.info.get('duration', 100)
-                    disposal = gif_image.info.get('disposal', 0)
-                    
-                    print(f"🎞️ フレーム {frame_index}: duration={duration}ms, disposal={disposal}, mode={gif_image.mode}")
-                    
-                    # フレームをRGBA形式で取得
-                    current_frame = gif_image.convert('RGBA')
-                    
-                    # 最初のフレームの場合、または単純にコピー
-                    if frame_index == 0 or total_frames == 1:
-                        final_frame = current_frame.copy()
-                    else:
-                        # 後続フレームは前フレームとの差分を考慮
-                        # 単純な方法: 直接使用（disposal methodは後で対応）
-                        final_frame = current_frame.copy()
-                    
-                    frames.append(final_frame)
-                    durations.append(duration)
-                    
-                    print(f"✅ フレーム {frame_index} 処理完了: {final_frame.size}")
-                    
-                except Exception as frame_error:
-                    print(f"⚠️ フレーム {frame_index} 処理エラー: {frame_error}")
-                    # フレーム処理に失敗した場合、前フレームをコピー
-                    if frames:
-                        frames.append(frames[-1].copy())
-                        durations.append(durations[-1] if durations else 100)
-                    break
+                    frames, durations = extract_frames_method2(gif_bytes)
+                except Exception as method2_error:
+                    print(f"⚠️ 方法2失敗: {method2_error}")
+            
+            # それでも失敗した場合は単一フレーム処理
+            if len(frames) == 0:
+                print("🔄 フォールバック: 単一フレーム処理")
+                gif_image.seek(0)
+                single_frame = gif_image.convert('RGBA')
+                frames = [single_frame]
+                durations = [100]
             
             print(f"📹 フレーム抽出完了: {len(frames)} フレーム検出")
             
@@ -206,6 +197,89 @@ def handler(request):
             'traceback': error_traceback.split('\n')[-3:-1] if error_traceback else []
         }
         return (json.dumps(error_response), 500, headers)
+
+
+def extract_frames_method1(gif_image, total_frames):
+    """標準的なフレーム抽出方法"""
+    frames = []
+    durations = []
+    
+    for frame_index in range(total_frames):
+        try:
+            # フレームにシーク
+            gif_image.seek(frame_index)
+            
+            # フレーム情報を取得
+            duration = gif_image.info.get('duration', 100)
+            disposal = gif_image.info.get('disposal', 0)
+            
+            print(f"🎞️ フレーム {frame_index}: duration={duration}ms, disposal={disposal}, mode={gif_image.mode}")
+            
+            # フレームをRGBA形式で取得
+            current_frame = gif_image.convert('RGBA')
+            
+            # フレーム累積処理（disposal methodに基づく）
+            if frame_index == 0:
+                final_frame = current_frame.copy()
+                base_frame = current_frame.copy()
+            else:
+                if disposal == 2:  # Restore to background
+                    # 背景に戻る場合は新しいフレームをそのまま使用
+                    final_frame = current_frame.copy()
+                    base_frame = current_frame.copy()
+                elif disposal == 1:  # Do not dispose
+                    # 前フレームを保持する場合
+                    final_frame = base_frame.copy()
+                    # 現在のフレームを合成
+                    final_frame.paste(current_frame, (0, 0), current_frame)
+                    base_frame = final_frame.copy()
+                else:  # disposal == 0 (No disposal specified) or others
+                    # 通常の合成
+                    final_frame = current_frame.copy()
+            
+            frames.append(final_frame)
+            durations.append(duration)
+            
+            print(f"✅ フレーム {frame_index} 処理完了: {final_frame.size}")
+            
+        except Exception as frame_error:
+            print(f"⚠️ フレーム {frame_index} 処理エラー: {frame_error}")
+            # エラーの場合は処理を停止
+            break
+    
+    return frames, durations
+
+
+def extract_frames_method2(gif_bytes):
+    """代替フレーム抽出方法（ImageSequenceイテレーター使用）"""
+    from PIL import ImageSequence
+    
+    gif_image = Image.open(io.BytesIO(gif_bytes))
+    frames = []
+    durations = []
+    
+    print("🔄 ImageSequenceイテレーターを使用")
+    
+    for i, frame in enumerate(ImageSequence.Iterator(gif_image)):
+        try:
+            duration = frame.info.get('duration', 100)
+            rgba_frame = frame.convert('RGBA')
+            
+            frames.append(rgba_frame)
+            durations.append(duration)
+            
+            print(f"📊 フレーム {i}: {rgba_frame.size}, duration={duration}ms")
+            
+            # 最大フレーム数制限（メモリ保護）
+            if i >= 200:
+                print("⚠️ フレーム数制限に達しました")
+                break
+                
+        except Exception as frame_error:
+            print(f"⚠️ フレーム {i} 処理エラー: {frame_error}")
+            break
+    
+    return frames, durations
 
 
 def analyze_frame_content(frame):
