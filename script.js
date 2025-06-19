@@ -1382,9 +1382,9 @@ class GamingTextGenerator {
         gifImg.src = dataUrl;
     }
 
-    // GIFプレビューアニメーション開始
+    // GIFプレビューアニメーション開始（DOM overlay方式）
     startGifPreview() {
-        console.log('▶️ GIFプレビューアニメーション開始');
+        console.log('▶️ GIFプレビューアニメーション開始（DOM overlay方式）');
         
         this.stopGifPreview(); // 既存のアニメーションを停止
         
@@ -1393,10 +1393,10 @@ class GamingTextGenerator {
             return;
         }
         
-        // プレビュー用の要素を作成
-        this.createGifPreviewOverlay();
+        // DOM overlay方式でプレビューを作成
+        this.createGifDOMPreview();
         
-        // アニメーションループ
+        // ゲーミングオーバーレイアニメーション
         let startTime = null;
         const animate = (currentTime) => {
             if (!startTime) startTime = currentTime;
@@ -1406,17 +1406,12 @@ class GamingTextGenerator {
             // ゲーミング効果のプログレス
             const progress = (elapsed * 0.001) * (parseInt(this.textAnimationSpeed.value) || 5);
             
-            // キャンバスをクリア
-            const ctx = this.textCanvas.getContext('2d');
-            ctx.clearRect(0, 0, this.textCanvas.width, this.textCanvas.height);
-            
-            // 元のGIFを描画（ブラウザが自動でアニメーション）
-            if (this.uploadedImage) {
-                ctx.drawImage(this.uploadedImage, 0, 0, this.textCanvas.width, this.textCanvas.height);
+            // オーバーレイキャンバスにゲーミング効果を描画
+            if (this.gifOverlayCanvas) {
+                const ctx = this.gifOverlayCanvas.getContext('2d');
+                ctx.clearRect(0, 0, this.gifOverlayCanvas.width, this.gifOverlayCanvas.height);
+                this.drawGamingOverlay(ctx, progress);
             }
-            
-            // ゲーミング効果をオーバーレイ
-            this.drawGamingOverlay(ctx, progress);
             
             // 次のフレームをリクエスト
             this.gifPreviewAnimationFrame = requestAnimationFrame(animate);
@@ -1432,34 +1427,95 @@ class GamingTextGenerator {
             this.gifPreviewAnimationFrame = null;
             console.log('⏹️ GIFプレビューアニメーション停止');
         }
+        // DOM要素をクリーンアップ
+        this.cleanupGifDOMPreview();
     }
 
-    // プレビュー用オーバーレイ作成
-    createGifPreviewOverlay() {
-        // Canvas要素のサイズを調整
-        if (this.uploadedImage) {
-            const maxWidth = 400;
-            const maxHeight = 400;
+    // DOM overlay方式でGIFプレビュー作成
+    createGifDOMPreview() {
+        console.log('🏗️ DOM overlay方式でプレビュー作成');
+        
+        // 既存のDOM要素をクリーンアップ
+        this.cleanupGifDOMPreview();
+        
+        if (!this.uploadedImage) return;
+        
+        // キャンバスコンテナを取得
+        const canvasSection = this.textCanvas.parentElement;
+        
+        // プレビューコンテナを作成
+        this.gifPreviewContainer = document.createElement('div');
+        this.gifPreviewContainer.style.cssText = `
+            position: relative;
+            display: inline-block;
+            max-width: 400px;
+            max-height: 400px;
+        `;
+        
+        // GIF画像要素を作成
+        this.gifImageElement = document.createElement('img');
+        this.gifImageElement.src = this.gifFrames[0].dataUrl;
+        this.gifImageElement.style.cssText = `
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        `;
+        
+        // オーバーレイキャンバスを作成
+        this.gifOverlayCanvas = document.createElement('canvas');
+        this.gifOverlayCanvas.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            mix-blend-mode: screen;
+        `;
+        
+        // 画像ロード完了時にキャンバスサイズを調整
+        this.gifImageElement.onload = () => {
+            const rect = this.gifImageElement.getBoundingClientRect();
+            this.gifOverlayCanvas.width = this.gifImageElement.naturalWidth;
+            this.gifOverlayCanvas.height = this.gifImageElement.naturalHeight;
+            this.gifOverlayCanvas.style.width = rect.width + 'px';
+            this.gifOverlayCanvas.style.height = rect.height + 'px';
             
-            let { width, height } = this.uploadedImage;
-            
-            // アスペクト比を維持してサイズ調整
-            if (width > maxWidth || height > maxHeight) {
-                const ratio = Math.min(maxWidth / width, maxHeight / height);
-                width *= ratio;
-                height *= ratio;
-            }
-            
-            this.textCanvas.width = width;
-            this.textCanvas.height = height;
-            
-            console.log(`🖼️ キャンバスサイズ調整: ${width}x${height}`);
+            console.log(`🖼️ GIFサイズ: ${this.gifImageElement.naturalWidth}x${this.gifImageElement.naturalHeight}`);
+            console.log(`📐 表示サイズ: ${rect.width}x${rect.height}`);
+        };
+        
+        // 要素を組み立て
+        this.gifPreviewContainer.appendChild(this.gifImageElement);
+        this.gifPreviewContainer.appendChild(this.gifOverlayCanvas);
+        
+        // 既存のキャンバスを非表示にして、プレビューコンテナを表示
+        this.textCanvas.style.display = 'none';
+        canvasSection.appendChild(this.gifPreviewContainer);
+    }
+
+    // DOM要素のクリーンアップ
+    cleanupGifDOMPreview() {
+        if (this.gifPreviewContainer) {
+            this.gifPreviewContainer.remove();
+            this.gifPreviewContainer = null;
         }
+        if (this.gifImageElement) {
+            this.gifImageElement = null;
+        }
+        if (this.gifOverlayCanvas) {
+            this.gifOverlayCanvas = null;
+        }
+        // 元のキャンバスを表示
+        this.textCanvas.style.display = 'block';
     }
 
     // ゲーミング効果オーバーレイ描画
     drawGamingOverlay(ctx, progress) {
-        const { width, height } = this.textCanvas;
+        const width = ctx.canvas.width;
+        const height = ctx.canvas.height;
         const animationType = this.textAnimationMode.value;
         const saturation = parseInt(this.textSaturation.value) || 100;
         

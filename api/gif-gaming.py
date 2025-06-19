@@ -52,52 +52,69 @@ def handler(request):
         frames = []
         durations = []
         
-        # 全フレームを抽出（改善版）
+        # 最も確実なGIFフレーム抽出方法を実装
         try:
-            frame_count = 0
-            base_image = None
+            # ベース画像のサイズを確定
+            gif_width = gif_image.width
+            gif_height = gif_image.height
+            print(f"📐 GIFサイズ: {gif_width}x{gif_height}")
             
+            # 背景色を取得（存在する場合）
+            background = gif_image.info.get('background', 0)
+            transparency = gif_image.info.get('transparency', None)
+            
+            # フレーム累積用のベース画像
+            base_canvas = Image.new('RGBA', (gif_width, gif_height), (0, 0, 0, 0))
+            
+            frame_count = 0
             while True:
-                # 現在のフレーム番号にシーク
+                # フレームにシーク
                 gif_image.seek(frame_count)
                 
                 # フレーム情報を取得
-                current_frame = gif_image.copy()
                 duration = gif_image.info.get('duration', 100)
                 disposal = gif_image.info.get('disposal', 0)
                 
-                # フレームサイズとオフセット
-                frame_box = current_frame.getbbox() or (0, 0, gif_image.width, gif_image.height)
-                
+                # フレームを完全な画像として構築
                 if frame_count == 0:
-                    # 最初のフレーム - ベース画像として保存
-                    base_image = Image.new('RGBA', gif_image.size, (0, 0, 0, 0))
-                    base_image.paste(current_frame.convert('RGBA'), (0, 0))
-                    final_frame = base_image.copy()
+                    # 最初のフレーム: 全体をコピー
+                    current_frame = gif_image.convert('RGBA')
+                    base_canvas = current_frame.copy()
+                    final_frame = current_frame.copy()
                 else:
-                    # 後続フレーム - disposal method を考慮して合成
-                    if disposal == 2:  # 背景色で復元
-                        base_image = Image.new('RGBA', gif_image.size, (0, 0, 0, 0))
-                    elif disposal == 1:  # そのまま保持
-                        pass  # base_imageはそのまま
-                    elif disposal == 3:  # 前フレームに復元（簡易実装では無視）
-                        pass
+                    # 後続フレーム: disposal methodに従って処理
+                    current_frame = gif_image.convert('RGBA')
                     
-                    # 現在のフレームをベースに合成
-                    temp_frame = base_image.copy()
+                    if disposal == 1:
+                        # Do not dispose: 前フレームを保持
+                        working_canvas = base_canvas.copy()
+                    elif disposal == 2:
+                        # Restore to background: 背景色で初期化
+                        working_canvas = Image.new('RGBA', (gif_width, gif_height), (0, 0, 0, 0))
+                    elif disposal == 3:
+                        # Restore to previous: 前フレームに戻す（簡易実装）
+                        working_canvas = base_canvas.copy()
+                    else:
+                        # 不明な場合は保持
+                        working_canvas = base_canvas.copy()
                     
-                    # フレームのオフセット位置を考慮して貼り付け
-                    try:
-                        # フレームのバウンディングボックスを取得
-                        left = getattr(gif_image, 'info', {}).get('left', 0)
-                        top = getattr(gif_image, 'info', {}).get('top', 0)
-                        temp_frame.paste(current_frame.convert('RGBA'), (left, top))
-                    except:
-                        # オフセット情報がない場合は(0,0)で貼り付け
-                        temp_frame.paste(current_frame.convert('RGBA'), (0, 0))
+                    # 現在のフレームを重ね合わせ
+                    # 透明ピクセルを考慮して合成
+                    for y in range(gif_height):
+                        for x in range(gif_width):
+                            pixel = current_frame.getpixel((x, y))
+                            if len(pixel) == 4 and pixel[3] > 0:  # アルファ値が0でない
+                                working_canvas.putpixel((x, y), pixel)
+                            elif len(pixel) == 3:  # RGB（アルファなし）
+                                # 透明色チェック
+                                if transparency is None or pixel != transparency:
+                                    working_canvas.putpixel((x, y), pixel + (255,))
                     
-                    final_frame = temp_frame
-                    base_image = final_frame.copy()
+                    final_frame = working_canvas.copy()
+                    
+                    # 次フレーム用にベースを更新
+                    if disposal != 2:  # 背景色復元でない場合のみ
+                        base_canvas = final_frame.copy()
                 
                 frames.append(final_frame)
                 durations.append(duration)
