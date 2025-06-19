@@ -7,136 +7,127 @@ import json
 import base64
 import io
 import math
-from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
-from http.server import BaseHTTPRequestHandler
+from PIL import Image, ImageDraw
 
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
+def handler(request):
+    # CORS ヘッダー
+    headers = {
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET,OPTIONS,PATCH,DELETE,POST,PUT',
+        'Access-Control-Allow-Headers': 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version',
+        'Content-Type': 'application/json'
+    }
+    
+    if request.method == 'OPTIONS':
+        return ('', 200, headers)
+    
+    if request.method != 'POST':
+        return (json.dumps({'error': 'Method not allowed'}), 405, headers)
+    
+    try:
+        # リクエストデータ取得
+        request_data = request.get_json()
+        
+        print("🚀 GIF Gaming処理開始")
+        
+        gif_data = request_data.get('gifData')
+        settings = request_data.get('settings', {})
+        
+        if not gif_data:
+            return (json.dumps({'error': 'GIFデータが見つかりません'}), 400, headers)
+
+        print("📊 設定:", settings)
+        
+        # Base64デコード
+        if gif_data.startswith('data:'):
+            gif_data = gif_data.split(',')[1]
+        
+        gif_bytes = base64.b64decode(gif_data)
+        
+        # PILでGIF解析
+        print("🔍 GIF解析中...")
+        gif_image = Image.open(io.BytesIO(gif_bytes))
+        
+        frames = []
+        durations = []
+        
+        # 全フレームを抽出
         try:
-            # CORS設定
-            self.send_response(200)
-            self.send_header('Access-Control-Allow-Credentials', 'true')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-            self.send_header('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version')
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-
-            # リクエストデータ取得
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
-            
-            print("🚀 GIF Gaming処理開始")
-            
-            gif_data = request_data.get('gifData')
-            settings = request_data.get('settings', {})
-            
-            if not gif_data:
-                self.wfile.write(json.dumps({'error': 'GIFデータが見つかりません'}).encode())
-                return
-
-            print("📊 設定:", settings)
-            
-            # Base64デコード
-            if gif_data.startswith('data:'):
-                gif_data = gif_data.split(',')[1]
-            
-            gif_bytes = base64.b64decode(gif_data)
-            
-            # PILでGIF解析
-            print("🔍 GIF解析中...")
-            gif_image = Image.open(io.BytesIO(gif_bytes))
-            
-            frames = []
-            durations = []
-            
-            # 全フレームを抽出
-            try:
-                frame_count = 0
-                while True:
-                    # フレームをRGBAに変換
-                    frame = gif_image.convert('RGBA')
-                    frames.append(frame)
-                    
-                    # フレーム間隔を取得（ミリ秒）
-                    duration = gif_image.info.get('duration', 100)
-                    durations.append(duration)
-                    
-                    frame_count += 1
-                    gif_image.seek(frame_count)
-                    
-            except EOFError:
-                # 全フレーム読み込み完了
-                pass
-            
-            print(f"📝 検出フレーム数: {len(frames)}")
-            
-            if len(frames) == 0:
-                self.wfile.write(json.dumps({'error': 'フレームが検出されませんでした'}).encode())
-                return
-            
-            # 各フレームにゲーミング効果を適用
-            print("🎨 フレーム処理開始...")
-            processed_frames = []
-            
-            for i, frame in enumerate(frames):
-                processed_frame = apply_gaming_effect(frame, i, len(frames), settings)
-                processed_frames.append(processed_frame)
-                print(f"✅ フレーム {i + 1}/{len(frames)} 完了")
-            
-            # GIF保存
-            print("💾 GIF生成中...")
-            output_buffer = io.BytesIO()
-            
-            # 最初のフレームでGIFを初期化
-            processed_frames[0].save(
-                output_buffer,
-                format='GIF',
-                save_all=True,
-                append_images=processed_frames[1:],
-                duration=durations,
-                loop=0,  # 無限ループ
-                optimize=False,  # 品質優先
-                disposal=2  # フレーム間でクリア
-            )
-            
-            # 結果をBase64エンコード
-            output_buffer.seek(0)
-            output_bytes = output_buffer.getvalue()
-            output_base64 = base64.b64encode(output_bytes).decode('utf-8')
-            
-            print("🎉 GIF生成完了")
-            
-            # レスポンス
-            response = {
-                'success': True,
-                'gifData': f'data:image/gif;base64,{output_base64}',
-                'frameCount': len(frames),
-                'size': len(output_bytes)
-            }
-            
-            self.wfile.write(json.dumps(response).encode())
-            
-        except Exception as error:
-            print(f"❌ GIF処理エラー: {error}")
-            import traceback
-            traceback.print_exc()
-            
-            error_response = {
-                'error': 'GIF処理に失敗しました',
-                'details': str(error)
-            }
-            self.wfile.write(json.dumps(error_response).encode())
-
-    def do_OPTIONS(self):
-        # プリフライトリクエスト対応
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Credentials', 'true')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-        self.send_header('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version')
-        self.end_headers()
+            frame_count = 0
+            while True:
+                # フレームをRGBAに変換
+                frame = gif_image.convert('RGBA')
+                frames.append(frame)
+                
+                # フレーム間隔を取得（ミリ秒）
+                duration = gif_image.info.get('duration', 100)
+                durations.append(duration)
+                
+                frame_count += 1
+                gif_image.seek(frame_count)
+                
+        except EOFError:
+            # 全フレーム読み込み完了
+            pass
+        
+        print(f"📝 検出フレーム数: {len(frames)}")
+        
+        if len(frames) == 0:
+            return (json.dumps({'error': 'フレームが検出されませんでした'}), 400, headers)
+        
+        # 各フレームにゲーミング効果を適用
+        print("🎨 フレーム処理開始...")
+        processed_frames = []
+        
+        for i, frame in enumerate(frames):
+            processed_frame = apply_gaming_effect(frame, i, len(frames), settings)
+            processed_frames.append(processed_frame)
+            print(f"✅ フレーム {i + 1}/{len(frames)} 完了")
+        
+        # GIF保存
+        print("💾 GIF生成中...")
+        output_buffer = io.BytesIO()
+        
+        # 最初のフレームでGIFを初期化
+        processed_frames[0].save(
+            output_buffer,
+            format='GIF',
+            save_all=True,
+            append_images=processed_frames[1:],
+            duration=durations,
+            loop=0,  # 無限ループ
+            optimize=False,  # 品質優先
+            disposal=2  # フレーム間でクリア
+        )
+        
+        # 結果をBase64エンコード
+        output_buffer.seek(0)
+        output_bytes = output_buffer.getvalue()
+        output_base64 = base64.b64encode(output_bytes).decode('utf-8')
+        
+        print("🎉 GIF生成完了")
+        
+        # レスポンス
+        response = {
+            'success': True,
+            'gifData': f'data:image/gif;base64,{output_base64}',
+            'frameCount': len(frames),
+            'size': len(output_bytes)
+        }
+        
+        return (json.dumps(response), 200, headers)
+        
+    except Exception as error:
+        print(f"❌ GIF処理エラー: {error}")
+        import traceback
+        traceback.print_exc()
+        
+        error_response = {
+            'error': 'GIF処理に失敗しました',
+            'details': str(error)
+        }
+        return (json.dumps(error_response), 500, headers)
 
 
 def apply_gaming_effect(frame, frame_index, total_frames, settings):
