@@ -1110,6 +1110,10 @@ class GamingTextGenerator {
         this.startTime = null;
         this.capturedFrames = [];
         
+        // 作成モードを初期化
+        this.creationMode = 'text'; // デフォルトはテキストモード
+        this.gifFrames = null;
+        
         // キャンバスの背景を透明に設定
         this.textCtx.globalCompositeOperation = 'source-over';
         
@@ -1228,6 +1232,9 @@ class GamingTextGenerator {
         this.modeText.addEventListener('change', () => this.handleModeChange());
         this.modeImage.addEventListener('change', () => this.handleModeChange());
         
+        // 初期モードを設定
+        this.updateCreationMode();
+        
         // 初期状態のUI表示設定
         this.handleAnimationModeChange();
         
@@ -1236,6 +1243,8 @@ class GamingTextGenerator {
     }
 
     handleModeChange() {
+        this.updateCreationMode();
+        
         if (this.modeText.checked) {
             // テキストモードに切り替え
             this.textInputGroup.style.display = 'block';
@@ -1243,12 +1252,23 @@ class GamingTextGenerator {
             // 画像をクリア
             this.uploadedImage = null;
             this.textImageInput.value = '';
+            this.gifFrames = null;
         } else {
             // 画像モードに切り替え
             this.textInputGroup.style.display = 'none';
             this.imageInputGroup.style.display = 'block';
         }
         this.autoGeneratePreview();
+    }
+    
+    updateCreationMode() {
+        // ラジオボタンの状態から作成モードを更新
+        if (this.modeText.checked) {
+            this.creationMode = 'text';
+        } else if (this.modeImage.checked) {
+            this.creationMode = 'image';
+        }
+        console.log('🔄 作成モード更新:', this.creationMode);
     }
 
     setupCanvas() {
@@ -3482,19 +3502,45 @@ class GamingTextGenerator {
             this.textDownloadGifBtn.textContent = 'サーバー処理中...';
             
             // Vercel APIを呼び出し
-            const response = await fetch('https://gaming-generator-kdcyoa64v-nakamuros-projects-f99bfc51.vercel.app/api/gif-gaming.py', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    gifData: base64Data,
-                    settings: settings
-                })
-            });
+            // 複数のURL候補を試行（フォールバック戦略）
+            const apiUrls = [
+                'https://gaming-generator-qjlika608-nakamuros-projects-f99bfc51.vercel.app', // 最新
+                'https://gaming-generator-kdcyoa64v-nakamuros-projects-f99bfc51.vercel.app', // 以前
+                'https://gaming-generator.vercel.app' // カスタムドメイン候補
+            ];
             
-            if (!response.ok) {
-                throw new Error(`API Error: ${response.status} ${response.statusText}`);
+            let response = null;
+            let lastError = null;
+            
+            for (const apiUrl of apiUrls) {
+                try {
+                    console.log(`🌐 API試行: ${apiUrl}`);
+                    response = await fetch(`${apiUrl}/api/gif-gaming.py`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            gifData: base64Data,
+                            settings: settings
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        console.log(`✅ ${apiUrl} で接続成功`);
+                        break; // 成功したのでループを抜ける
+                    } else {
+                        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ ${apiUrl} 接続失敗:`, error.message);
+                    lastError = error;
+                    response = null;
+                }
+            }
+            
+            if (!response || !response.ok) {
+                throw lastError || new Error('すべてのAPIエンドポイントで接続に失敗しました');
             }
             
             const result = await response.json();
@@ -3583,25 +3629,51 @@ class GamingTextGenerator {
     async testVercelConnection() {
         try {
             console.log('🧪 Vercel接続テスト開始');
-            const response = await fetch('https://gaming-generator-kdcyoa64v-nakamuros-projects-f99bfc51.vercel.app/api/test', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    test: 'connection',
-                    timestamp: new Date().toISOString()
-                })
-            });
+            // 複数のURL候補を試行（フォールバック戦略）
+            const apiUrls = [
+                'https://gaming-generator-qjlika608-nakamuros-projects-f99bfc51.vercel.app', // 最新
+                'https://gaming-generator-kdcyoa64v-nakamuros-projects-f99bfc51.vercel.app', // 以前
+                'https://gaming-generator.vercel.app' // カスタムドメイン候補
+            ];
             
-            const result = await response.json();
-            console.log('🧪 テストAPI結果:', result);
+            let response = null;
+            let lastError = null;
             
-            if (result.success) {
-                console.log('✅ Vercel接続正常');
-            } else {
-                console.warn('⚠️ Vercel接続に問題あり:', result);
+            for (const apiUrl of apiUrls) {
+                try {
+                    console.log(`🧪 テストAPI試行: ${apiUrl}`);
+                    response = await fetch(`${apiUrl}/api/test`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            test: 'connection',
+                            timestamp: new Date().toISOString()
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        console.log('🧪 テストAPI結果:', result);
+                        
+                        if (result.success) {
+                            console.log(`✅ ${apiUrl} で接続成功`);
+                            return; // 成功したので終了
+                        } else {
+                            console.warn('⚠️ Vercel接続に問題あり:', result);
+                        }
+                    } else {
+                        throw new Error(`${response.status} ${response.statusText}`);
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ ${apiUrl} テスト失敗:`, error.message);
+                    lastError = error;
+                }
             }
+            
+            // すべて失敗した場合
+            console.error('❌ すべてのAPIエンドポイントで接続テスト失敗:', lastError);
         } catch (error) {
             console.error('❌ Vercel接続テスト失敗:', error);
         }
