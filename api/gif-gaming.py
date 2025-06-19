@@ -52,29 +52,81 @@ def handler(request):
         frames = []
         durations = []
         
-        # 全フレームを抽出
+        # 全フレームを抽出（改善版）
         try:
             frame_count = 0
+            base_image = None
+            
             while True:
-                # フレームをRGBAに変換
-                frame = gif_image.convert('RGBA')
-                frames.append(frame)
+                # 現在のフレーム番号にシーク
+                gif_image.seek(frame_count)
                 
-                # フレーム間隔を取得（ミリ秒）
+                # フレーム情報を取得
+                current_frame = gif_image.copy()
                 duration = gif_image.info.get('duration', 100)
+                disposal = gif_image.info.get('disposal', 0)
+                
+                # フレームサイズとオフセット
+                frame_box = current_frame.getbbox() or (0, 0, gif_image.width, gif_image.height)
+                
+                if frame_count == 0:
+                    # 最初のフレーム - ベース画像として保存
+                    base_image = Image.new('RGBA', gif_image.size, (0, 0, 0, 0))
+                    base_image.paste(current_frame.convert('RGBA'), (0, 0))
+                    final_frame = base_image.copy()
+                else:
+                    # 後続フレーム - disposal method を考慮して合成
+                    if disposal == 2:  # 背景色で復元
+                        base_image = Image.new('RGBA', gif_image.size, (0, 0, 0, 0))
+                    elif disposal == 1:  # そのまま保持
+                        pass  # base_imageはそのまま
+                    elif disposal == 3:  # 前フレームに復元（簡易実装では無視）
+                        pass
+                    
+                    # 現在のフレームをベースに合成
+                    temp_frame = base_image.copy()
+                    
+                    # フレームのオフセット位置を考慮して貼り付け
+                    try:
+                        # フレームのバウンディングボックスを取得
+                        left = getattr(gif_image, 'info', {}).get('left', 0)
+                        top = getattr(gif_image, 'info', {}).get('top', 0)
+                        temp_frame.paste(current_frame.convert('RGBA'), (left, top))
+                    except:
+                        # オフセット情報がない場合は(0,0)で貼り付け
+                        temp_frame.paste(current_frame.convert('RGBA'), (0, 0))
+                    
+                    final_frame = temp_frame
+                    base_image = final_frame.copy()
+                
+                frames.append(final_frame)
                 durations.append(duration)
                 
+                print(f"🎞️ フレーム {frame_count}: duration={duration}ms, disposal={disposal}")
+                
                 frame_count += 1
-                gif_image.seek(frame_count)
                 
         except EOFError:
             # 全フレーム読み込み完了
+            print(f"📹 GIF解析完了: {frame_count} フレーム検出")
             pass
         
         print(f"📝 検出フレーム数: {len(frames)}")
         
         if len(frames) == 0:
             return (json.dumps({'error': 'フレームが検出されませんでした'}), 400, headers)
+        
+        # フレーム重複チェック（デバッグ用）
+        print("🔍 フレーム差分チェック...")
+        for i in range(min(3, len(frames))):  # 最初の3フレームをチェック
+            if i > 0:
+                # フレーム間の差分を計算
+                diff_pixels = 0
+                for y in range(frames[i].height):
+                    for x in range(frames[i].width):
+                        if frames[i].getpixel((x, y)) != frames[i-1].getpixel((x, y)):
+                            diff_pixels += 1
+                print(f"📊 フレーム {i-1} vs {i}: {diff_pixels} 画素の差分")
         
         # 各フレームにゲーミング効果を適用
         print("🎨 フレーム処理開始...")
@@ -83,7 +135,8 @@ def handler(request):
         for i, frame in enumerate(frames):
             processed_frame = apply_gaming_effect(frame, i, len(frames), settings)
             processed_frames.append(processed_frame)
-            print(f"✅ フレーム {i + 1}/{len(frames)} 完了")
+            if i < 5 or i % 5 == 0:  # 最初の5フレームまたは5フレームごとに出力
+                print(f"✅ フレーム {i + 1}/{len(frames)} 完了")
         
         # GIF保存
         print("💾 GIF生成中...")
@@ -193,41 +246,54 @@ def apply_gaming_effect(frame, frame_index, total_frames, settings):
             color = (r, g, b, 150)
             draw.line([(x, 0), (x, height)], fill=color)
     
-    # スクリーンブレンドモード的な合成
-    # PILではMultiplyやScreenモードが限定的なので、手動で計算
-    result = Image.new('RGBA', frame.size)
-    
-    for y in range(height):
-        for x in range(width):
-            # 元フレームのピクセル
-            orig_pixel = frame.getpixel((x, y))
-            overlay_pixel = overlay.getpixel((x, y))
-            
-            if len(orig_pixel) == 4:
-                orig_r, orig_g, orig_b, orig_a = orig_pixel
-            else:
-                orig_r, orig_g, orig_b = orig_pixel
-                orig_a = 255
-            
-            overlay_r, overlay_g, overlay_b, overlay_a = overlay_pixel
-            
-            # スクリーンブレンド効果
-            if overlay_a > 0:
-                # アルファ合成
-                alpha = overlay_a / 255.0 * 0.6  # 透明度調整
+    # 高速化: PIL Image.blend を使用したスクリーンブレンド
+    try:
+        # オーバーレイのアルファを調整
+        overlay_adjusted = Image.new('RGBA', frame.size)
+        overlay_pixels = overlay.load()
+        overlay_adj_pixels = overlay_adjusted.load()
+        
+        for y in range(height):
+            for x in range(width):
+                r, g, b, a = overlay_pixels[x, y]
+                # アルファ値を0.6倍に調整
+                new_alpha = int(a * 0.6)
+                overlay_adj_pixels[x, y] = (r, g, b, new_alpha)
+        
+        # PIL の composite を使用して高速合成
+        result = Image.alpha_composite(frame, overlay_adjusted)
+        return result
+        
+    except Exception as e:
+        print(f"⚠️ 高速合成失敗、フォールバックします: {e}")
+        # フォールバック: 元の手動実装
+        result = Image.new('RGBA', frame.size)
+        
+        for y in range(height):
+            for x in range(width):
+                orig_pixel = frame.getpixel((x, y))
+                overlay_pixel = overlay.getpixel((x, y))
                 
-                # スクリーンブレンド: 1 - (1-A) * (1-B)
-                new_r = int(255 - (255 - orig_r) * (255 - overlay_r) / 255)
-                new_g = int(255 - (255 - orig_g) * (255 - overlay_g) / 255)
-                new_b = int(255 - (255 - orig_b) * (255 - overlay_b) / 255)
+                if len(orig_pixel) == 4:
+                    orig_r, orig_g, orig_b, orig_a = orig_pixel
+                else:
+                    orig_r, orig_g, orig_b = orig_pixel
+                    orig_a = 255
                 
-                # アルファブレンド
-                final_r = int(orig_r * (1 - alpha) + new_r * alpha)
-                final_g = int(orig_g * (1 - alpha) + new_g * alpha)
-                final_b = int(orig_b * (1 - alpha) + new_b * alpha)
+                overlay_r, overlay_g, overlay_b, overlay_a = overlay_pixel
                 
-                result.putpixel((x, y), (final_r, final_g, final_b, orig_a))
-            else:
-                result.putpixel((x, y), (orig_r, orig_g, orig_b, orig_a))
-    
-    return result
+                if overlay_a > 0:
+                    alpha = overlay_a / 255.0 * 0.6
+                    new_r = int(255 - (255 - orig_r) * (255 - overlay_r) / 255)
+                    new_g = int(255 - (255 - orig_g) * (255 - overlay_g) / 255)
+                    new_b = int(255 - (255 - orig_b) * (255 - overlay_b) / 255)
+                    
+                    final_r = int(orig_r * (1 - alpha) + new_r * alpha)
+                    final_g = int(orig_g * (1 - alpha) + new_g * alpha)
+                    final_b = int(orig_b * (1 - alpha) + new_b * alpha)
+                    
+                    result.putpixel((x, y), (final_r, final_g, final_b, orig_a))
+                else:
+                    result.putpixel((x, y), (orig_r, orig_g, orig_b, orig_a))
+        
+        return result
