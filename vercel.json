@@ -1,6 +1,7 @@
 {
   "functions": {
-    "api/gif-gaming.js": {
+    "api/gif-gaming.py": {
+      "runtime": "python3.9",
       "maxDuration": 30
     }
   },

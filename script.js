@@ -3226,7 +3226,7 @@ class GamingTextGenerator {
             this.textDownloadGifBtn.textContent = 'サーバー処理中...';
             
             // Vercel APIを呼び出し
-            const response = await fetch('https://your-vercel-app.vercel.app/api/gif-gaming', {
+            const response = await fetch('https://gaming-generator-kdcyoa64v-nakamuros-projects-f99bfc51.vercel.app/api/gif-gaming.py', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

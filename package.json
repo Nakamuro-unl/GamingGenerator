@@ -2,18 +2,9 @@
   "name": "gaming-generator",
   "version": "1.0.0",
   "description": "Gaming effect generator with GIF animation support",
-  "type": "module",
   "scripts": {
     "dev": "vercel dev",
     "build": "vercel build",
     "deploy": "vercel --prod"
-  },
-  "dependencies": {
-    "canvas": "^2.11.2",
-    "gif-encoder-2": "^1.0.5",
-    "gifuct-js": "^2.1.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }
