@@ -3502,12 +3502,16 @@ class GamingTextGenerator {
             this.textDownloadGifBtn.textContent = 'サーバー処理中...';
             
             // Vercel APIを呼び出し
-            // 複数のURL候補を試行（フォールバック戦略）
+            // 現在のドメインを優先してAPIを呼び出し（CORS回避）
+            const currentDomain = window.location.origin;
             const apiUrls = [
+                currentDomain, // 現在のドメイン（CORS回避）
                 'https://gaming-generator-qjlika608-nakamuros-projects-f99bfc51.vercel.app', // 最新
                 'https://gaming-generator-kdcyoa64v-nakamuros-projects-f99bfc51.vercel.app', // 以前
                 'https://gaming-generator.vercel.app' // カスタムドメイン候補
             ];
+            
+            console.log('🌐 現在のドメイン:', currentDomain);
             
             let response = null;
             let lastError = null;
@@ -3629,12 +3633,16 @@ class GamingTextGenerator {
     async testVercelConnection() {
         try {
             console.log('🧪 Vercel接続テスト開始');
-            // 複数のURL候補を試行（フォールバック戦略）
+            // 現在のドメインを優先してAPIを呼び出し（CORS回避）
+            const currentDomain = window.location.origin;
             const apiUrls = [
+                currentDomain, // 現在のドメイン（CORS回避）
                 'https://gaming-generator-qjlika608-nakamuros-projects-f99bfc51.vercel.app', // 最新
                 'https://gaming-generator-kdcyoa64v-nakamuros-projects-f99bfc51.vercel.app', // 以前
                 'https://gaming-generator.vercel.app' // カスタムドメイン候補
             ];
+            
+            console.log('🌐 現在のドメイン:', currentDomain);
             
             let response = null;
             let lastError = null;
