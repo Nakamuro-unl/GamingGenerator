@@ -52,81 +52,67 @@ def handler(request):
         frames = []
         durations = []
         
-        # 最も確実なGIFフレーム抽出方法を実装
+        # より簡単で確実なGIFフレーム抽出（イテレーター使用）
         try:
-            # ベース画像のサイズを確定
-            gif_width = gif_image.width
-            gif_height = gif_image.height
-            print(f"📐 GIFサイズ: {gif_width}x{gif_height}")
+            print(f"📐 GIFサイズ: {gif_image.width}x{gif_image.height}")
+            print(f"🔍 GIF情報: format={gif_image.format}, mode={gif_image.mode}")
+            print(f"🎬 is_animated: {getattr(gif_image, 'is_animated', False)}")
+            print(f"📈 n_frames: {getattr(gif_image, 'n_frames', 1)}")
             
-            # 背景色を取得（存在する場合）
-            background = gif_image.info.get('background', 0)
-            transparency = gif_image.info.get('transparency', None)
+            # フレーム数を確認
+            total_frames = getattr(gif_image, 'n_frames', 1)
+            print(f"📊 総フレーム数: {total_frames}")
             
-            # フレーム累積用のベース画像
-            base_canvas = Image.new('RGBA', (gif_width, gif_height), (0, 0, 0, 0))
-            
-            frame_count = 0
-            while True:
-                # フレームにシーク
-                gif_image.seek(frame_count)
-                
-                # フレーム情報を取得
-                duration = gif_image.info.get('duration', 100)
-                disposal = gif_image.info.get('disposal', 0)
-                
-                # フレームを完全な画像として構築
-                if frame_count == 0:
-                    # 最初のフレーム: 全体をコピー
-                    current_frame = gif_image.convert('RGBA')
-                    base_canvas = current_frame.copy()
-                    final_frame = current_frame.copy()
-                else:
-                    # 後続フレーム: disposal methodに従って処理
+            # 各フレームを順次処理
+            for frame_index in range(total_frames):
+                try:
+                    # フレームにシーク
+                    gif_image.seek(frame_index)
+                    
+                    # フレーム情報を取得
+                    duration = gif_image.info.get('duration', 100)
+                    disposal = gif_image.info.get('disposal', 0)
+                    
+                    print(f"🎞️ フレーム {frame_index}: duration={duration}ms, disposal={disposal}, mode={gif_image.mode}")
+                    
+                    # フレームをRGBA形式で取得
                     current_frame = gif_image.convert('RGBA')
                     
-                    if disposal == 1:
-                        # Do not dispose: 前フレームを保持
-                        working_canvas = base_canvas.copy()
-                    elif disposal == 2:
-                        # Restore to background: 背景色で初期化
-                        working_canvas = Image.new('RGBA', (gif_width, gif_height), (0, 0, 0, 0))
-                    elif disposal == 3:
-                        # Restore to previous: 前フレームに戻す（簡易実装）
-                        working_canvas = base_canvas.copy()
+                    # 最初のフレームの場合、または単純にコピー
+                    if frame_index == 0 or total_frames == 1:
+                        final_frame = current_frame.copy()
                     else:
-                        # 不明な場合は保持
-                        working_canvas = base_canvas.copy()
+                        # 後続フレームは前フレームとの差分を考慮
+                        # 単純な方法: 直接使用（disposal methodは後で対応）
+                        final_frame = current_frame.copy()
                     
-                    # 現在のフレームを重ね合わせ
-                    # 透明ピクセルを考慮して合成
-                    for y in range(gif_height):
-                        for x in range(gif_width):
-                            pixel = current_frame.getpixel((x, y))
-                            if len(pixel) == 4 and pixel[3] > 0:  # アルファ値が0でない
-                                working_canvas.putpixel((x, y), pixel)
-                            elif len(pixel) == 3:  # RGB（アルファなし）
-                                # 透明色チェック
-                                if transparency is None or pixel != transparency:
-                                    working_canvas.putpixel((x, y), pixel + (255,))
+                    frames.append(final_frame)
+                    durations.append(duration)
                     
-                    final_frame = working_canvas.copy()
+                    print(f"✅ フレーム {frame_index} 処理完了: {final_frame.size}")
                     
-                    # 次フレーム用にベースを更新
-                    if disposal != 2:  # 背景色復元でない場合のみ
-                        base_canvas = final_frame.copy()
-                
-                frames.append(final_frame)
-                durations.append(duration)
-                
-                print(f"🎞️ フレーム {frame_count}: duration={duration}ms, disposal={disposal}")
-                
-                frame_count += 1
-                
-        except EOFError:
-            # 全フレーム読み込み完了
-            print(f"📹 GIF解析完了: {frame_count} フレーム検出")
-            pass
+                except Exception as frame_error:
+                    print(f"⚠️ フレーム {frame_index} 処理エラー: {frame_error}")
+                    # フレーム処理に失敗した場合、前フレームをコピー
+                    if frames:
+                        frames.append(frames[-1].copy())
+                        durations.append(durations[-1] if durations else 100)
+                    break
+            
+            print(f"📹 フレーム抽出完了: {len(frames)} フレーム検出")
+            
+        except Exception as extraction_error:
+            print(f"❌ フレーム抽出エラー: {extraction_error}")
+            # フォールバック: 最初のフレームのみ
+            try:
+                gif_image.seek(0)
+                first_frame = gif_image.convert('RGBA')
+                frames = [first_frame]
+                durations = [100]
+                print("🔄 フォールバック: 最初のフレームのみ使用")
+            except Exception as fallback_error:
+                print(f"❌ フォールバックも失敗: {fallback_error}")
+                raise fallback_error
         
         print(f"📝 検出フレーム数: {len(frames)}")
         
@@ -135,15 +121,22 @@ def handler(request):
         
         # フレーム重複チェック（デバッグ用）
         print("🔍 フレーム差分チェック...")
-        for i in range(min(3, len(frames))):  # 最初の3フレームをチェック
+        for i in range(min(5, len(frames))):  # 最初の5フレームをチェック
             if i > 0:
                 # フレーム間の差分を計算
                 diff_pixels = 0
+                total_pixels = frames[i].width * frames[i].height
                 for y in range(frames[i].height):
                     for x in range(frames[i].width):
                         if frames[i].getpixel((x, y)) != frames[i-1].getpixel((x, y)):
                             diff_pixels += 1
-                print(f"📊 フレーム {i-1} vs {i}: {diff_pixels} 画素の差分")
+                diff_percentage = (diff_pixels / total_pixels) * 100
+                print(f"📊 フレーム {i-1} vs {i}: {diff_pixels}/{total_pixels} 画素 ({diff_percentage:.1f}%) の差分")
+                
+                # フレーム内容の詳細確認
+                if i <= 2:  # 最初の2フレームの詳細分析
+                    frame_info = analyze_frame_content(frames[i])
+                    print(f"🎞️ フレーム {i} 内容: {frame_info}")
         
         # 各フレームにゲーミング効果を適用
         print("🎨 フレーム処理開始...")
@@ -191,13 +184,52 @@ def handler(request):
     except Exception as error:
         print(f"❌ GIF処理エラー: {error}")
         import traceback
-        traceback.print_exc()
+        error_traceback = traceback.format_exc()
+        print(f"📍 詳細エラー情報:\n{error_traceback}")
+        
+        # エラー箇所の特定
+        if "seek" in str(error).lower():
+            error_type = "GIFフレームシーク失敗"
+        elif "save" in str(error).lower():
+            error_type = "GIF保存失敗"
+        elif "memory" in str(error).lower():
+            error_type = "メモリ不足"
+        elif "pillow" in str(error).lower() or "pil" in str(error).lower():
+            error_type = "PIL/Pillowライブラリエラー"
+        else:
+            error_type = "不明なエラー"
         
         error_response = {
             'error': 'GIF処理に失敗しました',
-            'details': str(error)
+            'error_type': error_type,
+            'details': str(error),
+            'traceback': error_traceback.split('\n')[-3:-1] if error_traceback else []
         }
         return (json.dumps(error_response), 500, headers)
+
+
+def analyze_frame_content(frame):
+    """フレームの内容を分析してデバッグ情報を返す"""
+    width, height = frame.size
+    
+    # 色の分布を確認
+    colors = {}
+    for y in range(0, height, max(1, height//10)):  # サンプリング
+        for x in range(0, width, max(1, width//10)):
+            pixel = frame.getpixel((x, y))
+            if len(pixel) == 4:
+                r, g, b, a = pixel
+                if a > 0:  # 透明でない
+                    color_key = f"rgb({r},{g},{b})"
+                    colors[color_key] = colors.get(color_key, 0) + 1
+            else:
+                r, g, b = pixel
+                color_key = f"rgb({r},{g},{b})"
+                colors[color_key] = colors.get(color_key, 0) + 1
+    
+    # 主要色を取得
+    top_colors = sorted(colors.items(), key=lambda x: x[1], reverse=True)[:3]
+    return f"size={width}x{height}, top_colors={top_colors}"
 
 
 def apply_gaming_effect(frame, frame_index, total_frames, settings):

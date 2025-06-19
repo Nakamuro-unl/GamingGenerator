@@ -3488,7 +3488,9 @@ class GamingTextGenerator {
             const result = await response.json();
             
             if (!result.success) {
-                throw new Error(result.error || 'API処理に失敗しました');
+                const apiError = new Error(result.error || 'API処理に失敗しました');
+                apiError.serverData = result;  // サーバーからの詳細情報を保持
+                throw apiError;
             }
             
             console.log(`✅ GIF処理完了: ${result.frameCount}フレーム, サイズ: ${result.size}bytes`);
@@ -3509,7 +3511,20 @@ class GamingTextGenerator {
             
         } catch (error) {
             console.error('❌ Vercel API エラー:', error);
-            alert(`GIF処理に失敗しました。\nエラー: ${error.message}`);
+            
+            // 詳細なエラー情報を表示
+            let errorMessage = `GIF処理に失敗しました。\nエラー: ${error.message}`;
+            
+            // サーバーからの詳細エラー情報を取得
+            if (error.serverData) {
+                errorMessage += `\n\n詳細:\nタイプ: ${error.serverData.error_type || '不明'}\n内容: ${error.serverData.details || 'なし'}`;
+                if (error.serverData.traceback && error.serverData.traceback.length > 0) {
+                    errorMessage += `\nトレースバック: ${error.serverData.traceback.join(' → ')}`;
+                }
+                console.error('🔍 サーバーエラー詳細:', error.serverData);
+            }
+            
+            alert(errorMessage);
             this.textDownloadGifBtn.textContent = 'GIFで保存';
             this.textDownloadGifBtn.disabled = false;
         }
