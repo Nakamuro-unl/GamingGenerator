@@ -1153,6 +1153,7 @@ class GamingTextGenerator {
         this.uploadedImage = null;
         this.textDownloadBtn = document.getElementById('textDownloadBtn');
         this.textDownloadGifBtn = document.getElementById('textDownloadGifBtn');
+        this.debugTestBtn = document.getElementById('debugTestBtn');
         
         // テーマプレビュー関連
         this.lightCanvas = document.getElementById('lightCanvas');
@@ -1221,6 +1222,7 @@ class GamingTextGenerator {
         this.textGenerateBtn.addEventListener('click', () => this.generateText());
         this.textDownloadBtn.addEventListener('click', () => this.downloadImage());
         this.textDownloadGifBtn.addEventListener('click', () => this.downloadGif());
+        this.debugTestBtn.addEventListener('click', () => this.runDebugTest());
         
         // 作成モードラジオボタンのイベントリスナー
         this.modeText.addEventListener('change', () => this.handleModeChange());
@@ -3333,6 +3335,11 @@ class GamingTextGenerator {
     }
 
     async downloadGif() {
+        console.log('🚀 downloadGif開始');
+        console.log('🔍 creationMode:', this.creationMode);
+        console.log('🔍 gifFrames:', this.gifFrames ? this.gifFrames.length : 'null');
+        console.log('🔍 originalFile:', this.gifFrames && this.gifFrames[0] ? !!this.gifFrames[0].originalFile : 'false');
+        
         this.textDownloadGifBtn.textContent = '生成中...';
         this.textDownloadGifBtn.disabled = true;
         
@@ -3342,6 +3349,8 @@ class GamingTextGenerator {
                 console.log('🌐 Vercel API でGIF処理を開始...');
                 await this.processGifWithVercelAPI();
                 return;
+            } else {
+                console.log('⚠️ 条件不一致 - 通常のテキストモード処理に移行');
             }
             
             // テキストモードの場合は従来の方法
@@ -3456,6 +3465,9 @@ class GamingTextGenerator {
     async processGifWithVercelAPI() {
         const originalFile = this.gifFrames[0].originalFile;
         
+        // まずテストAPIで接続確認
+        await this.testVercelConnection();
+        
         try {
             // GIFファイルをBase64に変換
             const base64Data = await this.fileToBase64(originalFile);
@@ -3527,6 +3539,71 @@ class GamingTextGenerator {
             alert(errorMessage);
             this.textDownloadGifBtn.textContent = 'GIFで保存';
             this.textDownloadGifBtn.disabled = false;
+        }
+    }
+    
+    // デバッグテスト実行
+    async runDebugTest() {
+        console.log('🧪🧪🧪 === デバッグテスト開始 === 🧪🧪🧪');
+        console.log('📍 現在の状態確認:');
+        console.log('  - creationMode:', this.creationMode);
+        console.log('  - gifFrames:', this.gifFrames);
+        console.log('  - uploadedImage:', this.uploadedImage);
+        console.log('  - textImageInput files:', this.textImageInput.files.length);
+        
+        // 基本的なAPI接続テスト
+        await this.testVercelConnection();
+        
+        // GIFファイルがある場合の詳細テスト
+        if (this.gifFrames && this.gifFrames.length > 0) {
+            console.log('🎬 GIFファイル詳細:');
+            console.log('  - フレーム数:', this.gifFrames.length);
+            console.log('  - originalFile:', !!this.gifFrames[0].originalFile);
+            console.log('  - ファイルサイズ:', this.gifFrames[0].originalFile ? this.gifFrames[0].originalFile.size : 'なし');
+            console.log('  - ファイル名:', this.gifFrames[0].originalFile ? this.gifFrames[0].originalFile.name : 'なし');
+            
+            // Vercel API呼び出しテスト
+            if (this.gifFrames[0].originalFile) {
+                console.log('🌐 Vercel GIF API呼び出しテスト開始...');
+                try {
+                    await this.processGifWithVercelAPI();
+                } catch (error) {
+                    console.error('❌ Vercel GIF APIテスト失敗:', error);
+                }
+            }
+        } else {
+            console.log('⚠️ GIFファイルがアップロードされていません');
+            alert('デバッグテストを実行するには、まずGIFファイルをアップロードしてください。');
+        }
+        
+        console.log('🧪🧪🧪 === デバッグテスト完了 === 🧪🧪🧪');
+    }
+    
+    // Vercel接続テスト
+    async testVercelConnection() {
+        try {
+            console.log('🧪 Vercel接続テスト開始');
+            const response = await fetch('https://gaming-generator-kdcyoa64v-nakamuros-projects-f99bfc51.vercel.app/api/test', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    test: 'connection',
+                    timestamp: new Date().toISOString()
+                })
+            });
+            
+            const result = await response.json();
+            console.log('🧪 テストAPI結果:', result);
+            
+            if (result.success) {
+                console.log('✅ Vercel接続正常');
+            } else {
+                console.warn('⚠️ Vercel接続に問題あり:', result);
+            }
+        } catch (error) {
+            console.error('❌ Vercel接続テスト失敗:', error);
         }
     }
     
