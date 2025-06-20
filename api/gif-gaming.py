@@ -292,6 +292,15 @@ class handler(BaseHTTPRequestHandler):
                 elif animation_type == 'concentration':
                     # 集中線エフェクト
                     effect_color = self.get_concentration_color(x, y, width, height, progress)
+                elif animation_type == 'bluepurplepink':
+                    # ピンク・青グラデーション
+                    effect_color = self.get_blue_purple_pink_color(x, y, width, height, progress)
+                elif animation_type == 'pulse':
+                    # パルス効果（虹色ベース）
+                    effect_color = self.get_pulse_color(x, y, width, height, progress, saturation)
+                elif animation_type == 'rainbowPulse':
+                    # レインボーパルス
+                    effect_color = self.get_rainbow_pulse_color(x, y, width, height, progress, saturation)
                 else:
                     # デフォルトは虹色
                     effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
@@ -301,8 +310,8 @@ class handler(BaseHTTPRequestHandler):
                 final_g = min(255, int(255 - (255 - g) * (255 - effect_color[1]) / 255))
                 final_b = min(255, int(255 - (255 - b) * (255 - effect_color[2]) / 255))
                 
-                # 効果の強度を調整（30%の強度）
-                blend_factor = 0.3
+                # 効果の強度を調整（60%の強度でより鮮やかに）
+                blend_factor = 0.6
                 final_r = int(r * (1 - blend_factor) + final_r * blend_factor)
                 final_g = int(g * (1 - blend_factor) + final_g * blend_factor)
                 final_b = int(b * (1 - blend_factor) + final_b * blend_factor)
@@ -366,3 +375,84 @@ class handler(BaseHTTPRequestHandler):
         
         # 白い集中線
         return (intensity, intensity, intensity)
+    
+    def get_blue_purple_pink_color(self, x, y, width, height, progress):
+        """ピンク・青グラデーション効果計算"""
+        # 横方向のグラデーション位置
+        pos = (x / width + progress * 0.1) % 1.0
+        
+        if pos < 0.33:
+            # 青からピンクへ
+            t = pos / 0.33
+            r = int(100 + t * 155)  # 100 -> 255
+            g = int(150 * (1 - t))  # 150 -> 0
+            b = int(255 - t * 100)  # 255 -> 155
+        elif pos < 0.66:
+            # ピンクから紫へ
+            t = (pos - 0.33) / 0.33
+            r = int(255 - t * 100)  # 255 -> 155
+            g = int(t * 100)        # 0 -> 100
+            b = int(155 + t * 100)  # 155 -> 255
+        else:
+            # 紫から青へ
+            t = (pos - 0.66) / 0.34
+            r = int(155 - t * 55)   # 155 -> 100
+            g = int(100 + t * 50)   # 100 -> 150
+            b = 255                 # 255
+        
+        return (r, g, b)
+    
+    def get_pulse_color(self, x, y, width, height, progress, saturation):
+        """パルス効果計算"""
+        # 中心からの距離でパルス効果
+        center_x = width / 2
+        center_y = height / 2
+        distance = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+        max_distance = math.sqrt(center_x ** 2 + center_y ** 2)
+        
+        # パルス波
+        pulse = abs(math.sin(progress * 3 - distance / max_distance * 6))
+        
+        # 虹色をベースにパルス強度を適用
+        hue = int((distance / max_distance * 360 + progress * 36) % 360)
+        intensity = int(pulse * saturation * 2.55)
+        
+        # HSVからRGB変換（簡易版）
+        h = hue / 60.0
+        c = intensity
+        x_val = int(c * (1 - abs((h % 2) - 1)))
+        
+        if 0 <= h < 1:
+            r, g, b = c, x_val, 0
+        elif 1 <= h < 2:
+            r, g, b = x_val, c, 0
+        elif 2 <= h < 3:
+            r, g, b = 0, c, x_val
+        elif 3 <= h < 4:
+            r, g, b = 0, x_val, c
+        elif 4 <= h < 5:
+            r, g, b = x_val, 0, c
+        else:
+            r, g, b = c, 0, x_val
+        
+        return (r, g, b)
+    
+    def get_rainbow_pulse_color(self, x, y, width, height, progress, saturation):
+        """レインボーパルス効果計算"""
+        # 虹色グラデーション
+        rainbow_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
+        
+        # パルス効果
+        center_x = width / 2
+        center_y = height / 2
+        distance = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+        max_distance = math.sqrt(center_x ** 2 + center_y ** 2)
+        
+        pulse = abs(math.sin(progress * 4 - distance / max_distance * 8)) * 0.7 + 0.3
+        
+        # 虹色にパルス効果を適用
+        r = int(rainbow_color[0] * pulse)
+        g = int(rainbow_color[1] * pulse)
+        b = int(rainbow_color[2] * pulse)
+        
+        return (r, g, b)

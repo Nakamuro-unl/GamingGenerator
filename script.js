@@ -1354,13 +1354,7 @@ class GamingTextGenerator {
     }
 
     autoGeneratePreview() {
-        // 画像モードかつGIFの場合はGIFプレビューを使用
-        if (this.creationMode === 'image' && this.gifFrames && this.gifFrames.length > 0) {
-            this.startGifPreview();
-            return;
-        }
-        
-        // 通常のテキストアニメーション
+        // 全てのモードで統一されたアニメーション処理を使用
         if (this.textAnimationMode.value === 'rainbow') {
             this.startAnimation();
         } else if (this.textAnimationMode.value === 'bluepurplepink') {
@@ -1423,8 +1417,8 @@ class GamingTextGenerator {
             this.modeImage.checked = true;
             this.handleModeChange();
             
-            // GIFプレビューアニメーションを開始
-            this.startGifPreview();
+            // GIFも通常の画像と同じ処理を使用（プレビューをautoGeneratePreviewに統一）
+            this.autoGeneratePreview();
             
         } catch (error) {
             console.error('❌ GIFセットアップエラー:', error);
@@ -3520,12 +3514,15 @@ class GamingTextGenerator {
             // GIFファイルをBase64に変換
             const base64Data = await this.fileToBase64(originalFile);
             
-            // 設定を取得
+            // 設定を取得（全てのエフェクトパラメータを含む）
             const settings = {
-                animationType: this.textAnimationMode.value,
+                animationType: this.textAnimationMode.value || 'rainbow',
                 speed: parseInt(this.textAnimationSpeed.value) || 5,
-                saturation: parseInt(this.textSaturation.value) || 100
+                saturation: parseInt(this.textSaturation.value) || 100,
+                concentrationLines: this.textAnimationMode.value === 'concentration'
             };
+            
+            console.log('📊 GIF処理設定:', settings);
             
             this.textDownloadGifBtn.textContent = 'サーバー処理中...';
             
