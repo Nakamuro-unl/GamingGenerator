@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIFアニメーション動作テスト</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+        .log {
+            background: #f8f8f8;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: scroll;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🎮 GIFアニメーション動作テスト</h1>
+        
+        <div class="test-section">
+            <h2>1. 基本的なGIF読み込みテスト</h2>
+            <input type="file" id="testFileInput" accept="image/gif">
+            <br>
+            <canvas id="testCanvas" width="256" height="256"></canvas>
+            <div id="testLog" class="log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>2. サーバーAPI接続テスト</h2>
+            <button id="testApiBtn">API接続テスト</button>
+            <div id="apiLog" class="log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>3. GIFゲーミング効果テスト</h2>
+            <button id="testGamingBtn" disabled>ゲーミング効果テスト</button>
+            <div id="gamingLog" class="log"></div>
+            <canvas id="gamingCanvas" width="256" height="256"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let testFile = null;
+        
+        // ログ出力用ヘルパー
+        function log(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : (type === 'warning' ? 'warning' : (type === 'success' ? 'success' : ''));
+            container.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        // 1. 基本的なGIF読み込みテスト
+        document.getElementById('testFileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            testFile = file;
+            log('testLog', `ファイル選択: ${file.name} (${file.type})`);
+            
+            // GIF形式チェック
+            const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
+            if (!isGif) {
+                log('testLog', 'GIFファイルではありません', 'warning');
+                return;
+            }
+            
+            // ファイル読み込み
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    log('testLog', `画像読み込み成功: ${img.width}x${img.height}`, 'success');
+                    
+                    // キャンバスに描画
+                    const canvas = document.getElementById('testCanvas');
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // ボタンを有効化
+                    document.getElementById('testGamingBtn').disabled = false;
+                };
+                img.onerror = () => {
+                    log('testLog', '画像読み込み失敗', 'error');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        // 2. API接続テスト
+        document.getElementById('testApiBtn').addEventListener('click', async () => {
+            log('apiLog', 'API接続テスト開始');
+            
+            const apiUrls = [
+                window.location.origin, // 現在のドメイン
+                'https://gaming-generator-qjlika608-nakamuros-projects-f99bfc51.vercel.app',
+                'https://gaming-generator.vercel.app'
+            ];
+            
+            for (const apiUrl of apiUrls) {
+                try {
+                    log('apiLog', `テスト中: ${apiUrl}/api/test`);
+                    
+                    const response = await fetch(`${apiUrl}/api/test`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ test: true })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        log('apiLog', `✅ ${apiUrl} - 接続成功: ${data.message}`, 'success');
+                        return apiUrl; // 最初に成功したURLを返す
+                    } else {
+                        log('apiLog', `❌ ${apiUrl} - HTTP ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    log('apiLog', `❌ ${apiUrl} - ${error.message}`, 'error');
+                }
+            }
+            
+            log('apiLog', '全てのAPI接続に失敗しました', 'error');
+        });
+        
+        // 3. ゲーミング効果テスト
+        document.getElementById('testGamingBtn').addEventListener('click', async () => {
+            if (!testFile) {
+                log('gamingLog', 'テストファイルが選択されていません', 'error');
+                return;
+            }
+            
+            log('gamingLog', 'ゲーミング効果テスト開始');
+            
+            // ファイルをBase64に変換
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const base64Data = e.target.result;
+                
+                try {
+                    // API呼び出し
+                    const apiUrl = window.location.origin;
+                    log('gamingLog', `API呼び出し: ${apiUrl}/api/gif-gaming`);
+                    
+                    const response = await fetch(`${apiUrl}/api/gif-gaming`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            gifData: base64Data,
+                            settings: {
+                                animationType: 'rainbow',
+                                speed: 5,
+                                saturation: 100
+                            }
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        log('gamingLog', `✅ ゲーミング効果適用成功 (${data.frameCount}フレーム)`, 'success');
+                        
+                        // 結果を表示
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.getElementById('gamingCanvas');
+                            const ctx = canvas.getContext('2d');
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        };
+                        img.src = data.gifData;
+                        
+                    } else {
+                        const errorData = await response.json();
+                        log('gamingLog', `❌ API呼び出し失敗: ${errorData.error}`, 'error');
+                    }
+                    
+                } catch (error) {
+                    log('gamingLog', `❌ エラー: ${error.message}`, 'error');
+                }
+            };
+            reader.readAsDataURL(testFile);
+        });
+        
+        // 初期ログ
+        log('testLog', 'テスト準備完了 - GIFファイルを選択してください');
+        log('apiLog', 'API接続テストボタンをクリックしてください');
+        log('gamingLog', '最初にGIFファイルを選択してください');
+    </script>
+</body>
+</html>
