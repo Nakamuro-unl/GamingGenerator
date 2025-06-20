@@ -1,422 +1,317 @@
 """
-Vercel Function for GIF Gaming Effect Processing (Python版)
-PILを使用した確実なGIFフレーム処理
+GIFアニメーションにゲーミング効果を適用するAPI
 """
 
-import json
-import base64
+from http.server import BaseHTTPRequestHandler
+from PIL import Image, ImageDraw, ImageSequence
 import io
+import base64
+import json
 import math
-from PIL import Image, ImageDraw
 
-def handler(request):
-    # CORS ヘッダー
-    headers = {
-        'Access-Control-Allow-Credentials': 'true',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET,OPTIONS,PATCH,DELETE,POST,PUT',
-        'Access-Control-Allow-Headers': 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version',
-        'Content-Type': 'application/json'
-    }
+class handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Credentials', 'true')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
+        self.send_header('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version')
+        self.end_headers()
     
-    if request.method == 'OPTIONS':
-        return ('', 200, headers)
-    
-    if request.method != 'POST':
-        return (json.dumps({'error': 'Method not allowed'}), 405, headers)
-    
-    try:
-        # リクエストデータ取得
-        request_data = request.get_json()
-        
-        print("🚀 GIF Gaming処理開始")
-        
-        gif_data = request_data.get('gifData')
-        settings = request_data.get('settings', {})
-        
-        if not gif_data:
-            return (json.dumps({'error': 'GIFデータが見つかりません'}), 400, headers)
+    def do_POST(self):
+        try:
+            print("🚀 GIF Gaming処理開始")
+            
+            # リクエストボディを読み取り
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length) if content_length > 0 else b''
+            
+            if not post_data:
+                error_response = {'error': 'リクエストデータが空です'}
+                self.send_error_response(error_response, 400)
+                return
+            
+            # JSONデータをパース
+            try:
+                request_data = json.loads(post_data.decode('utf-8'))
+            except json.JSONDecodeError as e:
+                error_response = {'error': 'JSONデータの解析に失敗しました', 'details': str(e)}
+                self.send_error_response(error_response, 400)
+                return
+            
+            gif_data = request_data.get('gifData')
+            settings = request_data.get('settings', {})
+            
+            if not gif_data:
+                error_response = {'error': 'GIFデータが見つかりません'}
+                self.send_error_response(error_response, 400)
+                return
 
-        print("📊 設定:", settings)
+            print("📊 設定:", settings)
+            
+            # Base64デコード
+            if gif_data.startswith('data:'):
+                gif_data = gif_data.split(',')[1]
+            
+            gif_bytes = base64.b64decode(gif_data)
+            
+            # PILでGIF解析
+            print("🔍 GIF解析中...")
+            gif_image = Image.open(io.BytesIO(gif_bytes))
+            
+            frames = []
+            durations = []
+            
+            # より確実なGIFフレーム抽出
+            try:
+                print(f"📐 GIFサイズ: {gif_image.width}x{gif_image.height}")
+                print(f"🔍 GIF情報: format={gif_image.format}, mode={gif_image.mode}")
+                print(f"🎬 is_animated: {getattr(gif_image, 'is_animated', False)}")
+                print(f"📈 n_frames: {getattr(gif_image, 'n_frames', 1)}")
+                
+                # フレーム数を確認
+                total_frames = getattr(gif_image, 'n_frames', 1)
+                
+                # アニメーションGIFでない場合も適切に処理
+                if not getattr(gif_image, 'is_animated', False):
+                    print("📸 静的GIFとして検出")
+                    total_frames = 1
+                
+                print(f"📊 総フレーム数: {total_frames}")
+                
+                # フレーム抽出
+                if total_frames > 1:
+                    print("🔬 標準フレーム抽出")
+                    frames, durations = self.extract_frames_method1(gif_image, total_frames)
+                
+                # フレーム抽出が失敗した場合は代替方法
+                if len(frames) <= 1 and total_frames > 1:
+                    print("🔬 代替フレーム抽出")
+                    try:
+                        frames, durations = self.extract_frames_method2(gif_bytes)
+                    except Exception as method2_error:
+                        print(f"⚠️ 代替方法失敗: {method2_error}")
+                
+                # フォールバック
+                if len(frames) == 0:
+                    print("🔄 フォールバック: 単一フレーム処理")
+                    gif_image.seek(0)
+                    single_frame = gif_image.convert('RGBA')
+                    frames = [single_frame]
+                    durations = [100]
+                
+                print(f"📹 フレーム抽出完了: {len(frames)} フレーム検出")
+                
+            except Exception as extraction_error:
+                print(f"❌ フレーム抽出エラー: {extraction_error}")
+                # フォールバック: 最初のフレームのみ
+                try:
+                    gif_image.seek(0)
+                    first_frame = gif_image.convert('RGBA')
+                    frames = [first_frame]
+                    durations = [100]
+                    print("🔄 フォールバック: 最初のフレームのみ使用")
+                except Exception as fallback_error:
+                    print(f"❌ フォールバックも失敗: {fallback_error}")
+                    error_response = {'error': 'フレーム抽出に失敗しました', 'details': str(fallback_error)}
+                    self.send_error_response(error_response, 500)
+                    return
+            
+            print(f"📝 検出フレーム数: {len(frames)}")
+            
+            if len(frames) == 0:
+                error_response = {'error': 'フレームが検出されませんでした'}
+                self.send_error_response(error_response, 400)
+                return
+            
+            # 各フレームにゲーミング効果を適用
+            print("🎨 フレーム処理開始...")
+            processed_frames = []
+            
+            for i, frame in enumerate(frames):
+                processed_frame = self.apply_gaming_effect(frame, i, len(frames), settings)
+                processed_frames.append(processed_frame)
+                if i < 5 or i % 5 == 0:
+                    print(f"✅ フレーム {i + 1}/{len(frames)} 完了")
+            
+            # GIF保存
+            print("💾 GIF生成中...")
+            output_buffer = io.BytesIO()
+            
+            # 最初のフレームでGIFを初期化
+            processed_frames[0].save(
+                output_buffer,
+                format='GIF',
+                save_all=True,
+                append_images=processed_frames[1:],
+                duration=durations,
+                loop=0,
+                optimize=False,
+                disposal=2
+            )
+            
+            # 結果をBase64エンコード
+            output_buffer.seek(0)
+            output_bytes = output_buffer.getvalue()
+            output_base64 = base64.b64encode(output_bytes).decode('utf-8')
+            
+            print("🎉 GIF生成完了")
+            
+            # 成功レスポンス
+            response = {
+                'success': True,
+                'gifData': f'data:image/gif;base64,{output_base64}',
+                'frameCount': len(frames),
+                'size': len(output_bytes)
+            }
+            
+            self.send_success_response(response)
+            
+        except Exception as error:
+            print(f"❌ GIF処理エラー: {error}")
+            import traceback
+            error_traceback = traceback.format_exc()
+            print(f"📍 詳細エラー情報:\n{error_traceback}")
+            
+            error_response = {
+                'error': 'GIF処理に失敗しました',
+                'details': str(error),
+                'traceback': error_traceback.split('\n')[-3:-1] if error_traceback else []
+            }
+            self.send_error_response(error_response, 500)
+    
+    def send_success_response(self, data):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Credentials', 'true')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
+        self.send_header('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version')
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
         
-        # Base64デコード
-        if gif_data.startswith('data:'):
-            gif_data = gif_data.split(',')[1]
+        response_data = json.dumps(data).encode('utf-8')
+        self.wfile.write(response_data)
+    
+    def send_error_response(self, data, status_code):
+        self.send_response(status_code)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
         
-        gif_bytes = base64.b64decode(gif_data)
-        
-        # PILでGIF解析
-        print("🔍 GIF解析中...")
-        gif_image = Image.open(io.BytesIO(gif_bytes))
-        
+        response_data = json.dumps(data).encode('utf-8')
+        self.wfile.write(response_data)
+    
+    def extract_frames_method1(self, gif_image, total_frames):
+        """標準的なフレーム抽出方法"""
         frames = []
         durations = []
         
-        # より確実なGIFフレーム抽出（複数の方法を試行）
-        try:
-            print(f"📐 GIFサイズ: {gif_image.width}x{gif_image.height}")
-            print(f"🔍 GIF情報: format={gif_image.format}, mode={gif_image.mode}")
-            print(f"🎬 is_animated: {getattr(gif_image, 'is_animated', False)}")
-            print(f"📈 n_frames: {getattr(gif_image, 'n_frames', 1)}")
-            
-            # フレーム数を確認（複数の方法を試行）
-            total_frames = getattr(gif_image, 'n_frames', 1)
-            
-            # アニメーションGIFでない場合も適切に処理
-            if not getattr(gif_image, 'is_animated', False):
-                print("📸 静的GIFとして検出")
-                total_frames = 1
-            
-            print(f"📊 総フレーム数: {total_frames}")
-            
-            # フレーム抽出方法1: 標準的な方法
-            if total_frames > 1:
-                print("🔬 方法1: 標準フレーム抽出")
-                frames, durations = extract_frames_method1(gif_image, total_frames)
-            
-            # フレーム抽出が失敗した場合は方法2を試行
-            if len(frames) <= 1 and total_frames > 1:
-                print("🔬 方法2: 代替フレーム抽出")
-                try:
-                    frames, durations = extract_frames_method2(gif_bytes)
-                except Exception as method2_error:
-                    print(f"⚠️ 方法2失敗: {method2_error}")
-            
-            # それでも失敗した場合は単一フレーム処理
-            if len(frames) == 0:
-                print("🔄 フォールバック: 単一フレーム処理")
-                gif_image.seek(0)
-                single_frame = gif_image.convert('RGBA')
-                frames = [single_frame]
-                durations = [100]
-            
-            print(f"📹 フレーム抽出完了: {len(frames)} フレーム検出")
-            
-        except Exception as extraction_error:
-            print(f"❌ フレーム抽出エラー: {extraction_error}")
-            # フォールバック: 最初のフレームのみ
+        for frame_index in range(total_frames):
             try:
-                gif_image.seek(0)
-                first_frame = gif_image.convert('RGBA')
-                frames = [first_frame]
-                durations = [100]
-                print("🔄 フォールバック: 最初のフレームのみ使用")
-            except Exception as fallback_error:
-                print(f"❌ フォールバックも失敗: {fallback_error}")
-                raise fallback_error
-        
-        print(f"📝 検出フレーム数: {len(frames)}")
-        
-        if len(frames) == 0:
-            return (json.dumps({'error': 'フレームが検出されませんでした'}), 400, headers)
-        
-        # フレーム重複チェック（デバッグ用）
-        print("🔍 フレーム差分チェック...")
-        for i in range(min(5, len(frames))):  # 最初の5フレームをチェック
-            if i > 0:
-                # フレーム間の差分を計算
-                diff_pixels = 0
-                total_pixels = frames[i].width * frames[i].height
-                for y in range(frames[i].height):
-                    for x in range(frames[i].width):
-                        if frames[i].getpixel((x, y)) != frames[i-1].getpixel((x, y)):
-                            diff_pixels += 1
-                diff_percentage = (diff_pixels / total_pixels) * 100
-                print(f"📊 フレーム {i-1} vs {i}: {diff_pixels}/{total_pixels} 画素 ({diff_percentage:.1f}%) の差分")
+                gif_image.seek(frame_index)
+                duration = gif_image.info.get('duration', 100)
+                current_frame = gif_image.convert('RGBA')
                 
-                # フレーム内容の詳細確認
-                if i <= 2:  # 最初の2フレームの詳細分析
-                    frame_info = analyze_frame_content(frames[i])
-                    print(f"🎞️ フレーム {i} 内容: {frame_info}")
-        
-        # 各フレームにゲーミング効果を適用
-        print("🎨 フレーム処理開始...")
-        processed_frames = []
-        
-        for i, frame in enumerate(frames):
-            processed_frame = apply_gaming_effect(frame, i, len(frames), settings)
-            processed_frames.append(processed_frame)
-            if i < 5 or i % 5 == 0:  # 最初の5フレームまたは5フレームごとに出力
-                print(f"✅ フレーム {i + 1}/{len(frames)} 完了")
-        
-        # GIF保存
-        print("💾 GIF生成中...")
-        output_buffer = io.BytesIO()
-        
-        # 最初のフレームでGIFを初期化
-        processed_frames[0].save(
-            output_buffer,
-            format='GIF',
-            save_all=True,
-            append_images=processed_frames[1:],
-            duration=durations,
-            loop=0,  # 無限ループ
-            optimize=False,  # 品質優先
-            disposal=2  # フレーム間でクリア
-        )
-        
-        # 結果をBase64エンコード
-        output_buffer.seek(0)
-        output_bytes = output_buffer.getvalue()
-        output_base64 = base64.b64encode(output_bytes).decode('utf-8')
-        
-        print("🎉 GIF生成完了")
-        
-        # レスポンス
-        response = {
-            'success': True,
-            'gifData': f'data:image/gif;base64,{output_base64}',
-            'frameCount': len(frames),
-            'size': len(output_bytes)
-        }
-        
-        return (json.dumps(response), 200, headers)
-        
-    except Exception as error:
-        print(f"❌ GIF処理エラー: {error}")
-        import traceback
-        error_traceback = traceback.format_exc()
-        print(f"📍 詳細エラー情報:\n{error_traceback}")
-        
-        # エラー箇所の特定
-        if "seek" in str(error).lower():
-            error_type = "GIFフレームシーク失敗"
-        elif "save" in str(error).lower():
-            error_type = "GIF保存失敗"
-        elif "memory" in str(error).lower():
-            error_type = "メモリ不足"
-        elif "pillow" in str(error).lower() or "pil" in str(error).lower():
-            error_type = "PIL/Pillowライブラリエラー"
-        else:
-            error_type = "不明なエラー"
-        
-        error_response = {
-            'error': 'GIF処理に失敗しました',
-            'error_type': error_type,
-            'details': str(error),
-            'traceback': error_traceback.split('\n')[-3:-1] if error_traceback else []
-        }
-        return (json.dumps(error_response), 500, headers)
-
-
-def extract_frames_method1(gif_image, total_frames):
-    """標準的なフレーム抽出方法"""
-    frames = []
-    durations = []
-    
-    for frame_index in range(total_frames):
-        try:
-            # フレームにシーク
-            gif_image.seek(frame_index)
-            
-            # フレーム情報を取得
-            duration = gif_image.info.get('duration', 100)
-            disposal = gif_image.info.get('disposal', 0)
-            
-            print(f"🎞️ フレーム {frame_index}: duration={duration}ms, disposal={disposal}, mode={gif_image.mode}")
-            
-            # フレームをRGBA形式で取得
-            current_frame = gif_image.convert('RGBA')
-            
-            # フレーム累積処理（disposal methodに基づく）
-            if frame_index == 0:
-                final_frame = current_frame.copy()
-                base_frame = current_frame.copy()
-            else:
-                if disposal == 2:  # Restore to background
-                    # 背景に戻る場合は新しいフレームをそのまま使用
-                    final_frame = current_frame.copy()
-                    base_frame = current_frame.copy()
-                elif disposal == 1:  # Do not dispose
-                    # 前フレームを保持する場合
-                    final_frame = base_frame.copy()
-                    # 現在のフレームを合成
-                    final_frame.paste(current_frame, (0, 0), current_frame)
-                    base_frame = final_frame.copy()
-                else:  # disposal == 0 (No disposal specified) or others
-                    # 通常の合成
-                    final_frame = current_frame.copy()
-            
-            frames.append(final_frame)
-            durations.append(duration)
-            
-            print(f"✅ フレーム {frame_index} 処理完了: {final_frame.size}")
-            
-        except Exception as frame_error:
-            print(f"⚠️ フレーム {frame_index} 処理エラー: {frame_error}")
-            # エラーの場合は処理を停止
-            break
-    
-    return frames, durations
-
-
-def extract_frames_method2(gif_bytes):
-    """代替フレーム抽出方法（ImageSequenceイテレーター使用）"""
-    from PIL import ImageSequence
-    
-    gif_image = Image.open(io.BytesIO(gif_bytes))
-    frames = []
-    durations = []
-    
-    print("🔄 ImageSequenceイテレーターを使用")
-    
-    for i, frame in enumerate(ImageSequence.Iterator(gif_image)):
-        try:
-            duration = frame.info.get('duration', 100)
-            rgba_frame = frame.convert('RGBA')
-            
-            frames.append(rgba_frame)
-            durations.append(duration)
-            
-            print(f"📊 フレーム {i}: {rgba_frame.size}, duration={duration}ms")
-            
-            # 最大フレーム数制限（メモリ保護）
-            if i >= 200:
-                print("⚠️ フレーム数制限に達しました")
+                frames.append(current_frame)
+                durations.append(duration)
+                
+                print(f"✅ フレーム {frame_index} 処理完了: {current_frame.size}")
+                
+            except Exception as frame_error:
+                print(f"⚠️ フレーム {frame_index} 処理エラー: {frame_error}")
                 break
-                
-        except Exception as frame_error:
-            print(f"⚠️ フレーム {i} 処理エラー: {frame_error}")
-            break
-    
-    return frames, durations
-
-
-def analyze_frame_content(frame):
-    """フレームの内容を分析してデバッグ情報を返す"""
-    width, height = frame.size
-    
-    # 色の分布を確認
-    colors = {}
-    for y in range(0, height, max(1, height//10)):  # サンプリング
-        for x in range(0, width, max(1, width//10)):
-            pixel = frame.getpixel((x, y))
-            if len(pixel) == 4:
-                r, g, b, a = pixel
-                if a > 0:  # 透明でない
-                    color_key = f"rgb({r},{g},{b})"
-                    colors[color_key] = colors.get(color_key, 0) + 1
-            else:
-                r, g, b = pixel
-                color_key = f"rgb({r},{g},{b})"
-                colors[color_key] = colors.get(color_key, 0) + 1
-    
-    # 主要色を取得
-    top_colors = sorted(colors.items(), key=lambda x: x[1], reverse=True)[:3]
-    return f"size={width}x{height}, top_colors={top_colors}"
-
-
-def apply_gaming_effect(frame, frame_index, total_frames, settings):
-    """ゲーミング効果をフレームに適用"""
-    animation_type = settings.get('animationType', 'rainbow')
-    speed = settings.get('speed', 5)
-    saturation = settings.get('saturation', 100)
-    
-    # アニメーション進行度
-    progress = (frame_index / total_frames) * speed
-    
-    # エフェクトオーバーレイを作成
-    overlay = Image.new('RGBA', frame.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-    
-    width, height = frame.size
-    
-    if animation_type == 'rainbow':
-        # 虹色グラデーション
-        for x in range(width):
-            # 横方向のグラデーション + アニメーション
-            hue = int((x / width * 360 + progress * 36) % 360)
-            saturation_val = min(255, int(saturation * 2.55))
-            
-            # HSVからRGBに変換（簡易版）
-            h = hue / 60.0
-            c = saturation_val
-            x_val = int(c * (1 - abs((h % 2) - 1)))
-            
-            if 0 <= h < 1:
-                r, g, b = c, x_val, 0
-            elif 1 <= h < 2:
-                r, g, b = x_val, c, 0
-            elif 2 <= h < 3:
-                r, g, b = 0, c, x_val
-            elif 3 <= h < 4:
-                r, g, b = 0, x_val, c
-            elif 4 <= h < 5:
-                r, g, b = x_val, 0, c
-            else:
-                r, g, b = c, 0, x_val
-            
-            # 縦線を描画
-            color = (r, g, b, 150)  # 透明度150
-            draw.line([(x, 0), (x, height)], fill=color)
-    
-    elif animation_type == 'golden':
-        # 金ピカグラデーション
-        for x in range(width):
-            # 金色系のグラデーション
-            base_hue = 45  # 金色
-            hue_variation = int(math.sin(progress + x * 0.02) * 20)
-            final_hue = (base_hue + hue_variation) % 360
-            
-            # 明度変化
-            lightness = int(127 + math.sin(progress * 2 + x * 0.02) * 50)
-            
-            # 簡易HSLからRGB変換
-            r = min(255, lightness + 50)
-            g = min(255, lightness)
-            b = max(0, lightness - 100)
-            
-            color = (r, g, b, 150)
-            draw.line([(x, 0), (x, height)], fill=color)
-    
-    # 高速化: PIL Image.blend を使用したスクリーンブレンド
-    try:
-        # オーバーレイのアルファを調整
-        overlay_adjusted = Image.new('RGBA', frame.size)
-        overlay_pixels = overlay.load()
-        overlay_adj_pixels = overlay_adjusted.load()
         
-        for y in range(height):
-            for x in range(width):
-                r, g, b, a = overlay_pixels[x, y]
-                # アルファ値を0.6倍に調整
-                new_alpha = int(a * 0.6)
-                overlay_adj_pixels[x, y] = (r, g, b, new_alpha)
+        return frames, durations
+    
+    def extract_frames_method2(self, gif_bytes):
+        """代替フレーム抽出方法"""
+        gif_image = Image.open(io.BytesIO(gif_bytes))
+        frames = []
+        durations = []
         
-        # PIL の composite を使用して高速合成
-        result = Image.alpha_composite(frame, overlay_adjusted)
-        return result
+        print("🔄 ImageSequenceイテレーターを使用")
         
-    except Exception as e:
-        print(f"⚠️ 高速合成失敗、フォールバックします: {e}")
-        # フォールバック: 元の手動実装
-        result = Image.new('RGBA', frame.size)
-        
-        for y in range(height):
-            for x in range(width):
-                orig_pixel = frame.getpixel((x, y))
-                overlay_pixel = overlay.getpixel((x, y))
+        for i, frame in enumerate(ImageSequence.Iterator(gif_image)):
+            try:
+                duration = frame.info.get('duration', 100)
+                rgba_frame = frame.convert('RGBA')
                 
-                if len(orig_pixel) == 4:
-                    orig_r, orig_g, orig_b, orig_a = orig_pixel
-                else:
-                    orig_r, orig_g, orig_b = orig_pixel
-                    orig_a = 255
+                frames.append(rgba_frame)
+                durations.append(duration)
                 
-                overlay_r, overlay_g, overlay_b, overlay_a = overlay_pixel
+                print(f"📊 フレーム {i}: {rgba_frame.size}, duration={duration}ms")
                 
-                if overlay_a > 0:
-                    alpha = overlay_a / 255.0 * 0.6
-                    new_r = int(255 - (255 - orig_r) * (255 - overlay_r) / 255)
-                    new_g = int(255 - (255 - orig_g) * (255 - overlay_g) / 255)
-                    new_b = int(255 - (255 - orig_b) * (255 - overlay_b) / 255)
+                if i >= 100:  # フレーム数制限
+                    print("⚠️ フレーム数制限に達しました")
+                    break
                     
-                    final_r = int(orig_r * (1 - alpha) + new_r * alpha)
-                    final_g = int(orig_g * (1 - alpha) + new_g * alpha)
-                    final_b = int(orig_b * (1 - alpha) + new_b * alpha)
-                    
-                    result.putpixel((x, y), (final_r, final_g, final_b, orig_a))
-                else:
-                    result.putpixel((x, y), (orig_r, orig_g, orig_b, orig_a))
+            except Exception as frame_error:
+                print(f"⚠️ フレーム {i} 処理エラー: {frame_error}")
+                break
         
-        return result
+        return frames, durations
+    
+    def apply_gaming_effect(self, frame, frame_index, total_frames, settings):
+        """ゲーミング効果をフレームに適用"""
+        animation_type = settings.get('animationType', 'rainbow')
+        speed = settings.get('speed', 5)
+        saturation = settings.get('saturation', 100)
+        
+        # アニメーション進行度
+        progress = (frame_index / total_frames) * speed
+        
+        # エフェクトオーバーレイを作成
+        overlay = Image.new('RGBA', frame.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+        
+        width, height = frame.size
+        
+        if animation_type == 'rainbow':
+            # 虹色グラデーション
+            for x in range(width):
+                hue = int((x / width * 360 + progress * 36) % 360)
+                saturation_val = min(255, int(saturation * 2.55))
+                
+                # HSVからRGBに変換
+                h = hue / 60.0
+                c = saturation_val
+                x_val = int(c * (1 - abs((h % 2) - 1)))
+                
+                if 0 <= h < 1:
+                    r, g, b = c, x_val, 0
+                elif 1 <= h < 2:
+                    r, g, b = x_val, c, 0
+                elif 2 <= h < 3:
+                    r, g, b = 0, c, x_val
+                elif 3 <= h < 4:
+                    r, g, b = 0, x_val, c
+                elif 4 <= h < 5:
+                    r, g, b = x_val, 0, c
+                else:
+                    r, g, b = c, 0, x_val
+                
+                color = (r, g, b, 150)
+                draw.line([(x, 0), (x, height)], fill=color)
+        
+        elif animation_type == 'golden':
+            # 金ピカグラデーション
+            for x in range(width):
+                base_hue = 45
+                hue_variation = int(math.sin(progress + x * 0.02) * 20)
+                final_hue = (base_hue + hue_variation) % 360
+                
+                lightness = int(127 + math.sin(progress * 2 + x * 0.02) * 50)
+                
+                r = min(255, lightness + 50)
+                g = min(255, lightness)
+                b = max(0, lightness - 100)
+                
+                color = (r, g, b, 150)
+                draw.line([(x, 0), (x, height)], fill=color)
+        
+        # 高速合成
+        try:
+            result = Image.alpha_composite(frame, overlay)
+            return result
+        except Exception as e:
+            print(f"⚠️ 高速合成失敗: {e}")
+            return frame
