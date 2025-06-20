@@ -251,67 +251,118 @@ class handler(BaseHTTPRequestHandler):
         return frames, durations
     
     def apply_gaming_effect(self, frame, frame_index, total_frames, settings):
-        """ゲーミング効果をフレームに適用"""
+        """ゲーミング効果をフレームに適用（透過部分を除く）"""
         animation_type = settings.get('animationType', 'rainbow')
         speed = settings.get('speed', 5)
         saturation = settings.get('saturation', 100)
+        concentration_lines = settings.get('concentrationLines', False)
         
         # アニメーション進行度
         progress = (frame_index / total_frames) * speed
         
-        # エフェクトオーバーレイを作成
-        overlay = Image.new('RGBA', frame.size, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(overlay)
-        
+        # 結果画像を作成
+        result = Image.new('RGBA', frame.size)
         width, height = frame.size
         
-        if animation_type == 'rainbow':
-            # 虹色グラデーション
+        # ピクセル単位で処理（透過部分をスキップ）
+        frame_pixels = frame.load()
+        result_pixels = result.load()
+        
+        for y in range(height):
             for x in range(width):
-                hue = int((x / width * 360 + progress * 36) % 360)
-                saturation_val = min(255, int(saturation * 2.55))
+                orig_pixel = frame_pixels[x, y]
                 
-                # HSVからRGBに変換
-                h = hue / 60.0
-                c = saturation_val
-                x_val = int(c * (1 - abs((h % 2) - 1)))
-                
-                if 0 <= h < 1:
-                    r, g, b = c, x_val, 0
-                elif 1 <= h < 2:
-                    r, g, b = x_val, c, 0
-                elif 2 <= h < 3:
-                    r, g, b = 0, c, x_val
-                elif 3 <= h < 4:
-                    r, g, b = 0, x_val, c
-                elif 4 <= h < 5:
-                    r, g, b = x_val, 0, c
+                # アルファ値をチェック（透過の場合はそのまま）
+                if len(orig_pixel) == 4:
+                    r, g, b, a = orig_pixel
+                    if a == 0:  # 完全透過
+                        result_pixels[x, y] = orig_pixel
+                        continue
                 else:
-                    r, g, b = c, 0, x_val
+                    r, g, b = orig_pixel
+                    a = 255
                 
-                color = (r, g, b, 150)
-                draw.line([(x, 0), (x, height)], fill=color)
+                # 不透明部分にのみエフェクトを適用
+                if animation_type == 'rainbow':
+                    # 虹色エフェクト
+                    effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
+                elif animation_type == 'golden':
+                    # 金ピカエフェクト
+                    effect_color = self.get_golden_color(x, y, width, height, progress)
+                elif animation_type == 'concentration':
+                    # 集中線エフェクト
+                    effect_color = self.get_concentration_color(x, y, width, height, progress)
+                else:
+                    # デフォルトは虹色
+                    effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
+                
+                # スクリーンブレンドモードでエフェクトを合成
+                final_r = min(255, int(255 - (255 - r) * (255 - effect_color[0]) / 255))
+                final_g = min(255, int(255 - (255 - g) * (255 - effect_color[1]) / 255))
+                final_b = min(255, int(255 - (255 - b) * (255 - effect_color[2]) / 255))
+                
+                # 効果の強度を調整（30%の強度）
+                blend_factor = 0.3
+                final_r = int(r * (1 - blend_factor) + final_r * blend_factor)
+                final_g = int(g * (1 - blend_factor) + final_g * blend_factor)
+                final_b = int(b * (1 - blend_factor) + final_b * blend_factor)
+                
+                result_pixels[x, y] = (final_r, final_g, final_b, a)
         
-        elif animation_type == 'golden':
-            # 金ピカグラデーション
-            for x in range(width):
-                base_hue = 45
-                hue_variation = int(math.sin(progress + x * 0.02) * 20)
-                final_hue = (base_hue + hue_variation) % 360
-                
-                lightness = int(127 + math.sin(progress * 2 + x * 0.02) * 50)
-                
-                r = min(255, lightness + 50)
-                g = min(255, lightness)
-                b = max(0, lightness - 100)
-                
-                color = (r, g, b, 150)
-                draw.line([(x, 0), (x, height)], fill=color)
+        return result
+    
+    def get_rainbow_color(self, x, y, width, height, progress, saturation):
+        """虹色エフェクト計算"""
+        hue = int((x / width * 360 + progress * 36) % 360)
+        saturation_val = min(255, int(saturation * 2.55))
         
-        # 高速合成
-        try:
-            result = Image.alpha_composite(frame, overlay)
-            return result
-        except Exception as e:
-            print(f"⚠️ 高速合成失敗: {e}")
-            return frame
+        # HSVからRGBに変換
+        h = hue / 60.0
+        c = saturation_val
+        x_val = int(c * (1 - abs((h % 2) - 1)))
+        
+        if 0 <= h < 1:
+            r, g, b = c, x_val, 0
+        elif 1 <= h < 2:
+            r, g, b = x_val, c, 0
+        elif 2 <= h < 3:
+            r, g, b = 0, c, x_val
+        elif 3 <= h < 4:
+            r, g, b = 0, x_val, c
+        elif 4 <= h < 5:
+            r, g, b = x_val, 0, c
+        else:
+            r, g, b = c, 0, x_val
+        
+        return (r, g, b)
+    
+    def get_golden_color(self, x, y, width, height, progress):
+        """金ピカエフェクト計算"""
+        base_hue = 45
+        hue_variation = int(math.sin(progress + x * 0.02) * 20)
+        
+        lightness = int(127 + math.sin(progress * 2 + x * 0.02) * 50)
+        
+        r = min(255, lightness + 50)
+        g = min(255, lightness)
+        b = max(0, lightness - 100)
+        
+        return (r, g, b)
+    
+    def get_concentration_color(self, x, y, width, height, progress):
+        """集中線エフェクト計算"""
+        center_x = width / 2
+        center_y = height / 2
+        
+        # 中心からの角度
+        angle = math.atan2(y - center_y, x - center_x)
+        distance = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+        
+        # 集中線パターン
+        line_intensity = abs(math.sin(angle * 8 + progress * 2))
+        fade = max(0, 1 - distance / max(width, height))
+        
+        intensity = int(line_intensity * fade * 255)
+        
+        # 白い集中線
+        return (intensity, intensity, intensity)
