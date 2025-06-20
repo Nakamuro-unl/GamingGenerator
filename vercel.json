@@ -1,12 +1,4 @@
 {
-  "functions": {
-    "api/gif-gaming.py": {
-      "runtime": "@vercel/python"
-    },
-    "api/test.py": {
-      "runtime": "@vercel/python"
-    }
-  },
   "headers": [
     {
       "source": "/api/(.*)",
