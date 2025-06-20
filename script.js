@@ -1703,8 +1703,13 @@ class GamingTextGenerator {
         
         // 画像またはテキストを描画
         if (this.uploadedImage) {
-            // 画像アニメーションもテキストと同じ速度計算を使用
-            this.drawGamingImage(this.uploadedImage, animationMode, timeOffset);
+            // GIFの場合は元のアニメーションも表示
+            if (this.gifFrames && this.gifFrames.length > 0) {
+                this.drawGamingGifPreview(animationMode, timeOffset, currentTime);
+            } else {
+                // 通常の画像処理
+                this.drawGamingImage(this.uploadedImage, animationMode, timeOffset);
+            }
         } else {
             const isStretch = this.textStretch.checked;
             const centerX = this.textCanvas.width / 2;
@@ -3987,6 +3992,156 @@ class GamingTextGenerator {
         if (wasAnimating) {
             this.startAnimation();
         }
+    }
+
+    drawGamingGifPreview(animationMode, timeOffset, currentTime) {
+        // キャンバスをクリア
+        this.textCtx.clearRect(0, 0, this.textCanvas.width, this.textCanvas.height);
+        
+        // 元のGIF画像を描画（アニメーション効果）
+        this.textCtx.save();
+        
+        // キャンバスのアスペクト比に合わせて画像をフィットさせる
+        const canvasAspect = this.textCanvas.width / this.textCanvas.height;
+        const imageAspect = this.uploadedImage.width / this.uploadedImage.height;
+        
+        let drawWidth, drawHeight, drawX, drawY;
+        
+        if (canvasAspect > imageAspect) {
+            // キャンバスが横長の場合
+            drawHeight = this.textCanvas.height;
+            drawWidth = drawHeight * imageAspect;
+            drawX = (this.textCanvas.width - drawWidth) / 2;
+            drawY = 0;
+        } else {
+            // キャンバスが縦長の場合
+            drawWidth = this.textCanvas.width;
+            drawHeight = drawWidth / imageAspect;
+            drawX = 0;
+            drawY = (this.textCanvas.height - drawHeight) / 2;
+        }
+        
+        // 背景を透明にする場合の背景色設定
+        if (this.textBgTransparent && this.textBgTransparent.checked) {
+            // 透明背景の場合は何もしない
+        } else {
+            // 背景色を設定
+            this.textCtx.fillStyle = this.textBgColor ? this.textBgColor.value : '#000000';
+            this.textCtx.fillRect(0, 0, this.textCanvas.width, this.textCanvas.height);
+        }
+        
+        // GIF画像を描画
+        this.textCtx.drawImage(this.uploadedImage, drawX, drawY, drawWidth, drawHeight);
+        
+        // ゲーミング効果をオーバーレイとして適用
+        this.applyGamingOverlayToCanvas(animationMode, timeOffset);
+        
+        this.textCtx.restore();
+    }
+
+    applyGamingOverlayToCanvas(animationMode, timeOffset) {
+        const width = this.textCanvas.width;
+        const height = this.textCanvas.height;
+        
+        // アニメーション進行度
+        const progress = timeOffset || 0;
+        
+        // エフェクト別の描画
+        this.textCtx.save();
+        this.textCtx.globalCompositeOperation = 'screen'; // スクリーンブレンドモード
+        this.textCtx.globalAlpha = 0.6; // 60%の透明度
+        
+        if (animationMode === 'rainbow') {
+            // 虹色グラデーション
+            for (let x = 0; x < width; x += 2) {
+                const hue = (x / width * 360 + progress * 36) % 360;
+                const color = this.hsvToRgb(hue, 100, 100);
+                this.textCtx.strokeStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+                this.textCtx.lineWidth = 2;
+                this.textCtx.beginPath();
+                this.textCtx.moveTo(x, 0);
+                this.textCtx.lineTo(x, height);
+                this.textCtx.stroke();
+            }
+        } else if (animationMode === 'golden') {
+            // 金ピカ効果
+            for (let x = 0; x < width; x += 2) {
+                const lightness = Math.sin(progress * 2 + x * 0.02) * 50 + 127;
+                const r = Math.min(255, lightness + 50);
+                const g = Math.min(255, lightness);
+                const b = Math.max(0, lightness - 100);
+                this.textCtx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+                this.textCtx.lineWidth = 2;
+                this.textCtx.beginPath();
+                this.textCtx.moveTo(x, 0);
+                this.textCtx.lineTo(x, height);
+                this.textCtx.stroke();
+            }
+        } else if (animationMode === 'bluepurplepink') {
+            // ピンク青グラデーション
+            for (let x = 0; x < width; x += 2) {
+                const pos = (x / width + progress * 0.1) % 1.0;
+                let r, g, b;
+                
+                if (pos < 0.33) {
+                    const t = pos / 0.33;
+                    r = 100 + t * 155;
+                    g = 150 * (1 - t);
+                    b = 255 - t * 100;
+                } else if (pos < 0.66) {
+                    const t = (pos - 0.33) / 0.33;
+                    r = 255 - t * 100;
+                    g = t * 100;
+                    b = 155 + t * 100;
+                } else {
+                    const t = (pos - 0.66) / 0.34;
+                    r = 155 - t * 55;
+                    g = 100 + t * 50;
+                    b = 255;
+                }
+                
+                this.textCtx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+                this.textCtx.lineWidth = 2;
+                this.textCtx.beginPath();
+                this.textCtx.moveTo(x, 0);
+                this.textCtx.lineTo(x, height);
+                this.textCtx.stroke();
+            }
+        }
+        // 他のエフェクト（pulse、rainbowPulse、concentration）も必要に応じて追加
+        
+        this.textCtx.restore();
+    }
+
+    hsvToRgb(h, s, v) {
+        h = h / 60;
+        s = s / 100;
+        v = v / 100;
+        
+        const c = v * s;
+        const x = c * (1 - Math.abs((h % 2) - 1));
+        const m = v - c;
+        
+        let r, g, b;
+        if (h >= 0 && h < 1) {
+            r = c; g = x; b = 0;
+        } else if (h >= 1 && h < 2) {
+            r = x; g = c; b = 0;
+        } else if (h >= 2 && h < 3) {
+            r = 0; g = c; b = x;
+        } else if (h >= 3 && h < 4) {
+            r = 0; g = x; b = c;
+        } else if (h >= 4 && h < 5) {
+            r = x; g = 0; b = c;
+        } else {
+            r = c; g = 0; b = x;
+        }
+        
+        return {
+            r: Math.round((r + m) * 255),
+            g: Math.round((g + m) * 255),
+            b: Math.round((b + m) * 255)
+        };
     }
 }
 

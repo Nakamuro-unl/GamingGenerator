@@ -264,59 +264,87 @@ class handler(BaseHTTPRequestHandler):
         result = Image.new('RGBA', frame.size)
         width, height = frame.size
         
-        # ピクセル単位で処理（透過部分をスキップ）
-        frame_pixels = frame.load()
-        result_pixels = result.load()
+        # 高速化: エフェクトオーバーレイを作成してアルファブレンド
+        overlay = Image.new('RGBA', frame.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
         
-        for y in range(height):
-            for x in range(width):
-                orig_pixel = frame_pixels[x, y]
+        # エフェクト別の描画
+        if animation_type == 'rainbow':
+            for x in range(0, width, 2):  # ステップ2で高速化
+                effect_color = self.get_rainbow_color(x, 0, width, height, progress, saturation)
+                color = (*effect_color, 150)  # アルファ150
+                draw.line([(x, 0), (x, height)], fill=color)
+                if x + 1 < width:
+                    draw.line([(x + 1, 0), (x + 1, height)], fill=color)
+                    
+        elif animation_type == 'golden':
+            for x in range(0, width, 2):
+                effect_color = self.get_golden_color(x, 0, width, height, progress)
+                color = (*effect_color, 150)
+                draw.line([(x, 0), (x, height)], fill=color)
+                if x + 1 < width:
+                    draw.line([(x + 1, 0), (x + 1, height)], fill=color)
+                    
+        elif animation_type == 'bluepurplepink':
+            for x in range(0, width, 2):
+                effect_color = self.get_blue_purple_pink_color(x, 0, width, height, progress)
+                color = (*effect_color, 150)
+                draw.line([(x, 0), (x, height)], fill=color)
+                if x + 1 < width:
+                    draw.line([(x + 1, 0), (x + 1, height)], fill=color)
+                    
+        else:
+            # その他のエフェクトはピクセル単位処理（より高速化版）
+            frame_array = list(frame.getdata())
+            overlay_pixels = []
+            
+            for i, pixel in enumerate(frame_array):
+                x = i % width
+                y = i // width
                 
-                # アルファ値をチェック（透過の場合はそのまま）
-                if len(orig_pixel) == 4:
-                    r, g, b, a = orig_pixel
-                    if a == 0:  # 完全透過
-                        result_pixels[x, y] = orig_pixel
-                        continue
+                if len(pixel) == 4 and pixel[3] == 0:  # 透過
+                    overlay_pixels.append((0, 0, 0, 0))
                 else:
-                    r, g, b = orig_pixel
-                    a = 255
+                    if animation_type == 'concentration':
+                        effect_color = self.get_concentration_color(x, y, width, height, progress)
+                    elif animation_type == 'pulse':
+                        effect_color = self.get_pulse_color(x, y, width, height, progress, saturation)
+                    elif animation_type == 'rainbowPulse':
+                        effect_color = self.get_rainbow_pulse_color(x, y, width, height, progress, saturation)
+                    else:
+                        effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
+                    
+                    overlay_pixels.append((*effect_color, 150))
+            
+            overlay.putdata(overlay_pixels)
+        
+        # 高速アルファブレンド
+        try:
+            # フレームとマスクを作成
+            frame_mask = Image.new('L', frame.size, 0)
+            if frame.mode == 'RGBA':
+                frame_mask = frame.split()[3]  # アルファチャンネル
+            else:
+                frame_mask = Image.new('L', frame.size, 255)  # 完全不透明
                 
-                # 不透明部分にのみエフェクトを適用
-                if animation_type == 'rainbow':
-                    # 虹色エフェクト
-                    effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
-                elif animation_type == 'golden':
-                    # 金ピカエフェクト
-                    effect_color = self.get_golden_color(x, y, width, height, progress)
-                elif animation_type == 'concentration':
-                    # 集中線エフェクト
-                    effect_color = self.get_concentration_color(x, y, width, height, progress)
-                elif animation_type == 'bluepurplepink':
-                    # ピンク・青グラデーション
-                    effect_color = self.get_blue_purple_pink_color(x, y, width, height, progress)
-                elif animation_type == 'pulse':
-                    # パルス効果（虹色ベース）
-                    effect_color = self.get_pulse_color(x, y, width, height, progress, saturation)
-                elif animation_type == 'rainbowPulse':
-                    # レインボーパルス
-                    effect_color = self.get_rainbow_pulse_color(x, y, width, height, progress, saturation)
+            # エフェクトマスクを作成（透過部分を除外）
+            effect_mask = Image.new('L', frame.size, 0)
+            effect_pixels = []
+            for i, pixel in enumerate(frame.getdata()):
+                if len(pixel) == 4 and pixel[3] == 0:
+                    effect_pixels.append(0)  # 透過部分は効果なし
                 else:
-                    # デフォルトは虹色
-                    effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
-                
-                # スクリーンブレンドモードでエフェクトを合成
-                final_r = min(255, int(255 - (255 - r) * (255 - effect_color[0]) / 255))
-                final_g = min(255, int(255 - (255 - g) * (255 - effect_color[1]) / 255))
-                final_b = min(255, int(255 - (255 - b) * (255 - effect_color[2]) / 255))
-                
-                # 効果の強度を調整（60%の強度でより鮮やかに）
-                blend_factor = 0.6
-                final_r = int(r * (1 - blend_factor) + final_r * blend_factor)
-                final_g = int(g * (1 - blend_factor) + final_g * blend_factor)
-                final_b = int(b * (1 - blend_factor) + final_b * blend_factor)
-                
-                result_pixels[x, y] = (final_r, final_g, final_b, a)
+                    effect_pixels.append(int(255 * 0.6))  # 60%の強度
+            effect_mask.putdata(effect_pixels)
+            
+            # 最終合成
+            result = Image.composite(overlay, frame, effect_mask)
+            return result
+            
+        except Exception as e:
+            print(f"⚠️ 高速合成失敗、フォールバックします: {e}")
+            # フォールバック: シンプルなアルファブレンド
+            return Image.alpha_composite(frame, overlay)
         
         return result
     
