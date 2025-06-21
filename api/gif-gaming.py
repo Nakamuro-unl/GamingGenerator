@@ -290,63 +290,99 @@ class handler(BaseHTTPRequestHandler):
         
         # エフェクト別の描画
         if animation_type == 'rainbow':
-            # クライアントサイドと完全に同じ処理方式を使用
-            # パッチではなく直接フレームの画像データを変更
+            # クライアントサイドと完全同じRGBグラデーション処理を使用
             frame_array = list(frame.getdata())
             result_pixels = []
             
-            # 彩度レベル調整
+            # クライアントサイドと同じ虹色パレット
+            gaming_colors = [
+                [255, 0, 0],     # 赤
+                [255, 128, 0],   # オレンジ
+                [255, 255, 0],   # 黄
+                [0, 255, 0],     # 緑
+                [0, 128, 255],   # 青
+                [64, 0, 255],    # 藍
+                [128, 0, 255]    # 紫
+            ]
+            
+            # 彩度調整
+            if saturation != 100:
+                saturation_factor = saturation / 100.0
+                gaming_colors = [
+                    [
+                        int(r * saturation_factor + 128 * (1 - saturation_factor)),
+                        int(g * saturation_factor + 128 * (1 - saturation_factor)),
+                        int(b * saturation_factor + 128 * (1 - saturation_factor))
+                    ] for r, g, b in gaming_colors
+                ]
+            
+            # 時間正規化とカラーシフト（クライアントサイドと同じ）
+            normalized_time = (progress % 1 + 1) % 1  # 0-1の範囲
+            color_shift = normalized_time * len(gaming_colors)
+            
+            # グラデーション密度（クライアントサイドのデフォルト値）
+            gradient_density = 7.0
+            
+            # 彩度レベル（クライアントサイド準拠）
             saturation_level = saturation / 100.0
-            
-            # パルス効果の計算（クライアントサイドと同じ）
-            pulse = math.sin(progress * 2 * math.pi * 3)
-            pulse_intensity = 0.6 + (abs(pulse) * 0.4)  # 0.6-1.0の範囲
-            
-            # 基本速度（クライアントサイドと同じ）
-            base_speed = 2.0
-            hue_shift = abs(progress * base_speed) % 1  # 0-1の範囲
             
             for i, pixel in enumerate(frame_array):
                 if len(pixel) == 4 and pixel[3] == 0:  # 透過
                     result_pixels.append((0, 0, 0, 0))
                 else:
+                    # ピクセル位置計算
+                    x = i % width
+                    y = i // width
+                    
                     # 元画像の色を取得
                     original_r, original_g, original_b = pixel[0], pixel[1], pixel[2]
                     original_a = pixel[3] if len(pixel) == 4 else 255
                     
-                    # RGBからHSLに変換
-                    original_hsl = self.rgb_to_hsl(original_r, original_g, original_b)
+                    # 水平方向のグラデーション位置（クライアントサイドと同じ）
+                    position = x / width
                     
-                    # 色相をシフト（クライアントサイドと同じロジック）
-                    new_hue = (original_hsl[0] + hue_shift) % 1.0
+                    # グラデーション密度を適用してカラーインデックスを計算
+                    color_float = (position * gradient_density + color_shift) % len(gaming_colors)
+                    color_index = int(abs(color_float)) % len(gaming_colors)
+                    next_color_index = (color_index + 1) % len(gaming_colors)
                     
-                    # 彩度を調整（元の彩度をベースに強化）
-                    new_saturation = original_hsl[1]
-                    if new_saturation < 0.3:
-                        # 元々彩度が低い部分は適度に強化
-                        new_saturation = min(0.8, new_saturation + 0.4) * saturation_level
-                    else:
-                        # 元々彩度がある部分は元の値を活かしつつ調整
-                        new_saturation = min(1.0, new_saturation * 1.2) * saturation_level
+                    # 線形補間のブレンド率
+                    blend = max(0, min(1, color_float - math.floor(color_float)))
                     
-                    # 明度を調整
-                    new_lightness = original_hsl[2]
-                    if original_hsl[2] < 0.2:
-                        # 暗い部分は少し明るく
-                        new_lightness = min(0.6, original_hsl[2] * 1.5)
-                    elif original_hsl[2] > 0.8:
-                        # 明るい部分は少し抑制
-                        new_lightness = max(0.4, original_hsl[2] * 0.9)
+                    # 隣接色間の線形補間
+                    color1 = gaming_colors[color_index]
+                    color2 = gaming_colors[next_color_index]
                     
-                    # パルス効果で明度を変化
-                    new_lightness = max(0.1, min(0.9, new_lightness * pulse_intensity))
+                    blended_color = [
+                        round(color1[0] + (color2[0] - color1[0]) * blend),
+                        round(color1[1] + (color2[1] - color1[1]) * blend),
+                        round(color1[2] + (color2[2] - color1[2]) * blend)
+                    ]
                     
-                    # HSLからRGBに変換
-                    new_rgb = self.hsl_to_rgb(new_hue, new_saturation, new_lightness)
+                    # 元画像の輝度を計算（重み付きRGB）
+                    original_luminance = (original_r * 0.299 + original_g * 0.587 + original_b * 0.114) / 255
                     
-                    result_pixels.append((new_rgb[0], new_rgb[1], new_rgb[2], original_a))
+                    # 輝度強化（40%ブースト + 30%最小値）
+                    adjusted_luminance = max(0.3, min(1.0, original_luminance * 1.4))
+                    
+                    # 虹色に輝度を適用
+                    target_r = blended_color[0] * adjusted_luminance
+                    target_g = blended_color[1] * adjusted_luminance
+                    target_b = blended_color[2] * adjusted_luminance
+                    
+                    # 彩度レベルに基づいて元画像とブレンド
+                    final_r = target_r * saturation_level + original_r * (1 - saturation_level)
+                    final_g = target_g * saturation_level + original_g * (1 - saturation_level)
+                    final_b = target_b * saturation_level + original_b * (1 - saturation_level)
+                    
+                    # RGB範囲にクランプ
+                    final_r = max(0, min(255, round(final_r)))
+                    final_g = max(0, min(255, round(final_g)))
+                    final_b = max(0, min(255, round(final_b)))
+                    
+                    result_pixels.append((final_r, final_g, final_b, original_a))
             
-            # 直接フレームを変更（overlayではなく）
+            # 直接フレームを変更
             result = Image.new('RGBA', frame.size)
             result.putdata(result_pixels)
             return result
