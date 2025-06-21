@@ -290,61 +290,66 @@ class handler(BaseHTTPRequestHandler):
         
         # エフェクト別の描画
         if animation_type == 'rainbow':
-            # クライアントサイドと同じHSL色相シフト処理を使用
-            # ピクセル単位でHSL変換して滑らかなグラデーションを実現
+            # クライアントサイドと完全に同じ処理方式を使用
+            # パッチではなく直接フレームの画像データを変更
             frame_array = list(frame.getdata())
-            overlay_pixels = []
+            result_pixels = []
             
             # 彩度レベル調整
             saturation_level = saturation / 100.0
             
-            # パルス効果の計算
+            # パルス効果の計算（クライアントサイドと同じ）
             pulse = math.sin(progress * 2 * math.pi * 3)
             pulse_intensity = 0.6 + (abs(pulse) * 0.4)  # 0.6-1.0の範囲
             
-            # 基本速度
+            # 基本速度（クライアントサイドと同じ）
             base_speed = 2.0
             hue_shift = abs(progress * base_speed) % 1  # 0-1の範囲
             
             for i, pixel in enumerate(frame_array):
-                x = i % width
-                y = i // width
-                
                 if len(pixel) == 4 and pixel[3] == 0:  # 透過
-                    overlay_pixels.append((0, 0, 0, 0))
+                    result_pixels.append((0, 0, 0, 0))
                 else:
                     # 元画像の色を取得
                     original_r, original_g, original_b = pixel[0], pixel[1], pixel[2]
+                    original_a = pixel[3] if len(pixel) == 4 else 255
                     
                     # RGBからHSLに変換
                     original_hsl = self.rgb_to_hsl(original_r, original_g, original_b)
                     
-                    # 色相をシフト
+                    # 色相をシフト（クライアントサイドと同じロジック）
                     new_hue = (original_hsl[0] + hue_shift) % 1.0
                     
                     # 彩度を調整（元の彩度をベースに強化）
                     new_saturation = original_hsl[1]
                     if new_saturation < 0.3:
+                        # 元々彩度が低い部分は適度に強化
                         new_saturation = min(0.8, new_saturation + 0.4) * saturation_level
                     else:
+                        # 元々彩度がある部分は元の値を活かしつつ調整
                         new_saturation = min(1.0, new_saturation * 1.2) * saturation_level
                     
                     # 明度を調整
                     new_lightness = original_hsl[2]
                     if original_hsl[2] < 0.2:
+                        # 暗い部分は少し明るく
                         new_lightness = min(0.6, original_hsl[2] * 1.5)
                     elif original_hsl[2] > 0.8:
+                        # 明るい部分は少し抑制
                         new_lightness = max(0.4, original_hsl[2] * 0.9)
                     
-                    # パルス効果を適用
+                    # パルス効果で明度を変化
                     new_lightness = max(0.1, min(0.9, new_lightness * pulse_intensity))
                     
                     # HSLからRGBに変換
                     new_rgb = self.hsl_to_rgb(new_hue, new_saturation, new_lightness)
                     
-                    overlay_pixels.append((*new_rgb, 200))  # アルファ値を適切に設定
+                    result_pixels.append((new_rgb[0], new_rgb[1], new_rgb[2], original_a))
             
-            overlay.putdata(overlay_pixels)
+            # 直接フレームを変更（overlayではなく）
+            result = Image.new('RGBA', frame.size)
+            result.putdata(result_pixels)
+            return result
                     
         elif animation_type == 'golden':
             for x in range(0, width, 2):
