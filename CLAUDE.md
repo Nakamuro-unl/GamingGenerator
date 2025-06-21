@@ -5,25 +5,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 重要な制約
 
 - **日本語で対応すること** - UIテキストやコメントは日本語を維持
-- **Git操作の制限** - Remote操作は絶対禁止（本番稼働中のため）
-- **ローカル変更のみ** - コミット、プッシュ、マージは行わない
+- **プロダクション環境** - デバッグ機能は削除済み、リリース準備完了
 
 ## Project Overview
 
-This is a client-side web application called "Gaming Generator" (ゲーミングジェネレーター) that creates gaming-themed visual effects. It's a pure HTML/CSS/JavaScript application with no server-side components or build process required.
+This is a web application called "Gaming Generator" (ゲーミングジェネレーター) that creates gaming-themed visual effects. It combines client-side processing with Vercel API for advanced GIF animation processing.
 
 ## Architecture & Structure
 
-The project consists of static files served directly:
+The project consists of:
 - `index.html` - Main HTML with tab-based UI for two generators
 - `script.js` - Main JavaScript logic handling both generators
 - `styles.css` - All styling including responsive design and dark mode
 - `gif.js` & `gif.worker.js` - Third-party library for GIF generation (MIT License)
+- `api/gif-gaming.py` - Vercel API for advanced GIF animation processing
 
 ## Key Features
 
 1. **Concentration Lines Generator** (集中線ジェネレーター) - Creates manga-style speed lines with gaming effects
 2. **Gaming Text/Stamp Generator** (ゲーミングスタンプ) - Creates animated text/image stamps with rainbow effects
+3. **GIF Animation Enhancement** - Applies gaming effects to uploaded GIF animations with frame synchronization
 
 ## Common Development Tasks
 

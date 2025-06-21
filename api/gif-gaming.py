@@ -20,7 +20,6 @@ class handler(BaseHTTPRequestHandler):
     
     def do_POST(self):
         try:
-            print("🚀 GIF Gaming処理開始")
             
             # リクエストボディを読み取り
             content_length = int(self.headers.get('Content-Length', 0))
@@ -47,7 +46,6 @@ class handler(BaseHTTPRequestHandler):
                 self.send_error_response(error_response, 400)
                 return
 
-            print("📊 設定:", settings)
             
             # Base64デコード
             if gif_data.startswith('data:'):
@@ -56,7 +54,6 @@ class handler(BaseHTTPRequestHandler):
             gif_bytes = base64.b64decode(gif_data)
             
             # PILでGIF解析
-            print("🔍 GIF解析中...")
             gif_image = Image.open(io.BytesIO(gif_bytes))
             
             frames = []
@@ -64,60 +61,45 @@ class handler(BaseHTTPRequestHandler):
             
             # より確実なGIFフレーム抽出
             try:
-                print(f"📐 GIFサイズ: {gif_image.width}x{gif_image.height}")
-                print(f"🔍 GIF情報: format={gif_image.format}, mode={gif_image.mode}")
-                print(f"🎬 is_animated: {getattr(gif_image, 'is_animated', False)}")
-                print(f"📈 n_frames: {getattr(gif_image, 'n_frames', 1)}")
                 
                 # フレーム数を確認
                 total_frames = getattr(gif_image, 'n_frames', 1)
                 
                 # アニメーションGIFでない場合も適切に処理
                 if not getattr(gif_image, 'is_animated', False):
-                    print("📸 静的GIFとして検出")
                     total_frames = 1
                 
-                print(f"📊 総フレーム数: {total_frames}")
                 
                 # フレーム抽出
                 if total_frames > 1:
-                    print("🔬 標準フレーム抽出")
                     frames, durations = self.extract_frames_method1(gif_image, total_frames)
                 
                 # フレーム抽出が失敗した場合は代替方法
                 if len(frames) <= 1 and total_frames > 1:
-                    print("🔬 代替フレーム抽出")
                     try:
                         frames, durations = self.extract_frames_method2(gif_bytes)
                     except Exception as method2_error:
-                        print(f"⚠️ 代替方法失敗: {method2_error}")
                 
                 # フォールバック
                 if len(frames) == 0:
-                    print("🔄 フォールバック: 単一フレーム処理")
                     gif_image.seek(0)
                     single_frame = gif_image.convert('RGBA')
                     frames = [single_frame]
                     durations = [100]
                 
-                print(f"📹 フレーム抽出完了: {len(frames)} フレーム検出")
                 
             except Exception as extraction_error:
-                print(f"❌ フレーム抽出エラー: {extraction_error}")
                 # フォールバック: 最初のフレームのみ
                 try:
                     gif_image.seek(0)
                     first_frame = gif_image.convert('RGBA')
                     frames = [first_frame]
                     durations = [100]
-                    print("🔄 フォールバック: 最初のフレームのみ使用")
                 except Exception as fallback_error:
-                    print(f"❌ フォールバックも失敗: {fallback_error}")
                     error_response = {'error': 'フレーム抽出に失敗しました', 'details': str(fallback_error)}
                     self.send_error_response(error_response, 500)
                     return
             
-            print(f"📝 検出フレーム数: {len(frames)}")
             
             if len(frames) == 0:
                 error_response = {'error': 'フレームが検出されませんでした'}
@@ -125,8 +107,6 @@ class handler(BaseHTTPRequestHandler):
                 return
             
             # 各フレームにゲーミング効果を適用（フレーム数に基づく同期）
-            print("🎨 フレーム処理開始...")
-            print(f"🎞️ 総フレーム数: {len(frames)} - エフェクトループを同期")
             processed_frames = []
             
             # フレーム同期: エフェクト1周期をGIF全体で完結させる
@@ -135,7 +115,6 @@ class handler(BaseHTTPRequestHandler):
             # キャンバスサイズを取得（ゲーミングテキスト生成のキャンバスサイズに合わせる）
             canvas_width = settings.get('canvasWidth', 800)
             canvas_height = settings.get('canvasHeight', 600)
-            print(f"📐 出力サイズ: {canvas_width}x{canvas_height}")
             
             for i, frame in enumerate(frames):
                 # フレーム進行度を0-1の範囲で計算（完全同期）
@@ -147,10 +126,8 @@ class handler(BaseHTTPRequestHandler):
                 processed_frame = self.apply_gaming_effect(resized_frame, i, len(frames), settings, frame_progress)
                 processed_frames.append(processed_frame)
                 if i < 5 or i % 5 == 0:
-                    print(f"✅ フレーム {i + 1}/{len(frames)} 完了 (進行度: {frame_progress:.2f}, サイズ: {processed_frame.size})")
             
             # GIF保存
-            print("💾 GIF生成中...")
             output_buffer = io.BytesIO()
             
             # 最初のフレームでGIFを初期化
@@ -170,7 +147,6 @@ class handler(BaseHTTPRequestHandler):
             output_bytes = output_buffer.getvalue()
             output_base64 = base64.b64encode(output_bytes).decode('utf-8')
             
-            print("🎉 GIF生成完了")
             
             # 成功レスポンス
             response = {
@@ -183,10 +159,8 @@ class handler(BaseHTTPRequestHandler):
             self.send_success_response(response)
             
         except Exception as error:
-            print(f"❌ GIF処理エラー: {error}")
             import traceback
             error_traceback = traceback.format_exc()
-            print(f"📍 詳細エラー情報:\n{error_traceback}")
             
             error_response = {
                 'error': 'GIF処理に失敗しました',
@@ -229,10 +203,8 @@ class handler(BaseHTTPRequestHandler):
                 frames.append(current_frame)
                 durations.append(duration)
                 
-                print(f"✅ フレーム {frame_index} 処理完了: {current_frame.size}")
                 
             except Exception as frame_error:
-                print(f"⚠️ フレーム {frame_index} 処理エラー: {frame_error}")
                 break
         
         return frames, durations
@@ -243,7 +215,6 @@ class handler(BaseHTTPRequestHandler):
         frames = []
         durations = []
         
-        print("🔄 ImageSequenceイテレーターを使用")
         
         for i, frame in enumerate(ImageSequence.Iterator(gif_image)):
             try:
@@ -253,14 +224,11 @@ class handler(BaseHTTPRequestHandler):
                 frames.append(rgba_frame)
                 durations.append(duration)
                 
-                print(f"📊 フレーム {i}: {rgba_frame.size}, duration={duration}ms")
                 
                 if i >= 100:  # フレーム数制限
-                    print("⚠️ フレーム数制限に達しました")
                     break
                     
             except Exception as frame_error:
-                print(f"⚠️ フレーム {i} 処理エラー: {frame_error}")
                 break
         
         return frames, durations
@@ -470,7 +438,6 @@ class handler(BaseHTTPRequestHandler):
             return result
             
         except Exception as e:
-            print(f"⚠️ 高速合成失敗、フォールバックします: {e}")
             # フォールバック: シンプルなアルファブレンド
             return Image.alpha_composite(frame, overlay)
         
