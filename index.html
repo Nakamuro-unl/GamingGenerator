@@ -398,14 +398,18 @@
     <!-- API診断パネル（開発用） -->
     <div id="apiDiagnostics" style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 5px; font-size: 12px; max-width: 350px; z-index: 9999;">
         <div style="margin-bottom: 5px; font-weight: bold;">API診断</div>
+        <div style="margin-bottom: 3px; font-size: 9px;">基本テスト:</div>
         <div style="margin-bottom: 5px;">
-            <button onclick="testAPI('hello')" style="margin-right: 2px; padding: 1px 4px; font-size: 10px;">Hello</button>
-            <button onclick="testAPI('simple')" style="margin-right: 2px; padding: 1px 4px; font-size: 10px;">Simple</button>
-            <button onclick="testAPI('status')" style="margin-right: 2px; padding: 1px 4px; font-size: 10px;">Status</button>
+            <button onclick="testAPI('hello')" style="margin-right: 1px; padding: 1px 3px; font-size: 9px;">Hello</button>
+            <button onclick="testAPI('simple')" style="margin-right: 1px; padding: 1px 3px; font-size: 9px;">Simple</button>
+            <button onclick="testAPI('test-basic')" style="margin-right: 1px; padding: 1px 3px; font-size: 9px;">Basic</button>
+            <button onclick="testAPI('test-modern')" style="margin-right: 1px; padding: 1px 3px; font-size: 9px;">Modern</button>
         </div>
+        <div style="margin-bottom: 3px; font-size: 9px;">詳細診断:</div>
         <div style="margin-bottom: 5px;">
-            <button onclick="testAPI('gif-gaming')" style="margin-right: 2px; padding: 1px 4px; font-size: 10px;">Main API</button>
-            <button onclick="testAPI('gif-gaming-minimal')" style="margin-right: 2px; padding: 1px 4px; font-size: 10px;">Minimal</button>
+            <button onclick="testAPI('diagnose')" style="margin-right: 1px; padding: 1px 3px; font-size: 9px;">Diagnose</button>
+            <button onclick="testAPI('gif-gaming')" style="margin-right: 1px; padding: 1px 3px; font-size: 9px;">Main API</button>
+            <button onclick="testAPI('gif-gaming-minimal')" style="margin-right: 1px; padding: 1px 3px; font-size: 9px;">Minimal</button>
         </div>
         <button onclick="toggleDiagnostics()" style="padding: 2px 5px; font-size: 11px;">閉じる</button>
         <div id="apiStatus" style="margin-top: 5px; font-size: 10px;"></div>
