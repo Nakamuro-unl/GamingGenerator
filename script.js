@@ -3692,7 +3692,9 @@ class GamingTextGenerator {
     
     // Base64をBlobに変換
     base64ToBlob(base64Data) {
-        const byteCharacters = atob(base64Data.split(',')[1]);
+        // Data URLの場合はカンマで分割、そうでなければそのまま使用
+        const base64String = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+        const byteCharacters = atob(base64String);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
             byteNumbers[i] = byteCharacters.charCodeAt(i);
@@ -4273,7 +4275,7 @@ async function testAPI(endpoint = 'gif-gaming', testPost = false) {
                     <div>Status: ${data.status || 'unknown'}</div>
                     <div>Message: ${data.message || 'no message'}</div>
                     ${data.pil_available !== undefined ? `<div>PIL: ${data.pil_available ? '✓' : '✗'}</div>` : ''}
-                    ${data.python_version ? `<div>Python: ${data.python_version.split(' ')[0]}</div>` : ''}
+                    ${data.python_version ? `<div>Python: ${typeof data.python_version === 'string' ? data.python_version.split(' ')[0] : String(data.python_version).split(' ')[0]}</div>` : ''}
                     ${data.pil_error ? `<div style="color: #FFB6C1;">PIL Error: ${data.pil_error}</div>` : ''}
                 `;
             } catch (jsonError) {
