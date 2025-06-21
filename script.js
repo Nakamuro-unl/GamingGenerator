@@ -4255,12 +4255,11 @@ async function testAPI(endpoint = 'gif-gaming') {
                     ${data.pil_error ? `<div style="color: #FFB6C1;">PIL Error: ${data.pil_error}</div>` : ''}
                 `;
             } catch (jsonError) {
-                // JSON parsing failed, show raw response
+                // JSON parsing failed, show raw response (for hello endpoint)
                 const text = await response.text();
                 statusDiv.innerHTML = `
-                    <div style="color: #90EE90;">✓ ${endpoint} 応答あり</div>
-                    <div style="color: #FFB6C1;">JSON Parse Error</div>
-                    <div style="font-size: 9px; max-height: 60px; overflow-y: auto;">${text.substring(0, 200)}${text.length > 200 ? '...' : ''}</div>
+                    <div style="color: #90EE90;">✓ ${endpoint} 応答あり (Text)</div>
+                    <div style="font-size: 9px; max-height: 60px; overflow-y: auto; background: rgba(255,255,255,0.1); padding: 2px;">${text.substring(0, 200)}${text.length > 200 ? '...' : ''}</div>
                 `;
             }
         } else {
