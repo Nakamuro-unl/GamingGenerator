@@ -290,12 +290,42 @@ class handler(BaseHTTPRequestHandler):
         
         # エフェクト別の描画
         if animation_type == 'rainbow':
-            for x in range(0, width, 2):  # ステップ2で高速化
-                effect_color = self.get_rainbow_color(x, 0, width, height, progress, saturation)
-                color = (*effect_color, 200)  # アルファ値を上げて色味を強化
+            # クライアントサイドと同じ虹色配列を使用
+            gaming_colors = [
+                (255, 0, 0),     # 赤
+                (255, 128, 0),   # オレンジ
+                (255, 255, 0),   # 黄
+                (0, 255, 0),     # 緑
+                (0, 128, 255),   # 青
+                (64, 0, 255),    # 藍
+                (128, 0, 255)    # 紫
+            ]
+            
+            # 彩度調整
+            if saturation != 100:
+                saturation_factor = saturation / 100.0
+                gaming_colors = [
+                    (
+                        int(r * saturation_factor + 128 * (1 - saturation_factor)),
+                        int(g * saturation_factor + 128 * (1 - saturation_factor)),
+                        int(b * saturation_factor + 128 * (1 - saturation_factor))
+                    ) for r, g, b in gaming_colors
+                ]
+            
+            # 時間ベースの色選択
+            base_speed = 2.0
+            color_index = int(abs(progress * base_speed)) % len(gaming_colors)
+            current_color = gaming_colors[color_index]
+            
+            # グラデーション幅をクライアントサイドと統一（1ピクセル単位）
+            for x in range(width):
+                # X位置に基づくグラデーション（クライアントサイドロジックと統一）
+                gradient_pos = (x / width + progress) % 1.0
+                gradient_color_index = int(gradient_pos * len(gaming_colors)) % len(gaming_colors)
+                effect_color = gaming_colors[gradient_color_index]
+                
+                color = (*effect_color, 220)  # アルファ値を更に強化
                 draw.line([(x, 0), (x, height)], fill=color)
-                if x + 1 < width:
-                    draw.line([(x + 1, 0), (x + 1, height)], fill=color)
                     
         elif animation_type == 'golden':
             for x in range(0, width, 2):
@@ -339,10 +369,13 @@ class handler(BaseHTTPRequestHandler):
                             effect_color = self.get_concentration_color(x, y, width, height, progress)
                         elif animation_type == 'pulse':
                             effect_color = self.get_pulse_color(x, y, width, height, progress, saturation)
+                        elif animation_type == 'rainbow':
+                            # rainbowは上記の最適化処理を使用するため、ここでは基本色を返す
+                            effect_color = (255, 255, 255)
                         else:
                             effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
                         
-                        overlay_pixels.append((*effect_color, 200))  # アルファ値を上げて色味を強化
+                        overlay_pixels.append((*effect_color, 220))  # アルファ値を更に強化
                 
                 overlay.putdata(overlay_pixels)
         
