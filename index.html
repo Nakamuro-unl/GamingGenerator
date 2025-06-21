@@ -399,7 +399,8 @@
     <div id="apiDiagnostics" style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 5px; font-size: 12px; max-width: 300px; z-index: 9999;">
         <div style="margin-bottom: 5px; font-weight: bold;">API診断</div>
         <div style="margin-bottom: 5px;">
-            <button onclick="testAPI('gif-gaming')" style="margin-right: 5px; padding: 2px 8px; font-size: 11px;">GIF API テスト</button>
+            <button onclick="testAPI('gif-gaming')" style="margin-right: 3px; padding: 2px 6px; font-size: 10px;">GET</button>
+            <button onclick="testAPI('gif-gaming', true)" style="margin-right: 3px; padding: 2px 6px; font-size: 10px;">POST</button>
         </div>
         <button onclick="toggleDiagnostics()" style="padding: 2px 5px; font-size: 11px;">閉じる</button>
         <div id="apiStatus" style="margin-top: 5px; font-size: 10px;"></div>

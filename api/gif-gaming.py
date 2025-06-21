@@ -31,22 +31,42 @@ class handler(BaseHTTPRequestHandler):
             # リクエストボディ読み取り
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length == 0:
-                self.send_error_response({'error': 'No request body'}, 400)
+                self.send_error_response({
+                    'error': 'No request body',
+                    'content_length': content_length,
+                    'headers': dict(self.headers)
+                }, 400)
                 return
             
             post_data = self.rfile.read(content_length)
             
+            # デバッグ情報追加
+            if not post_data:
+                self.send_error_response({
+                    'error': 'Empty post data',
+                    'content_length': content_length,
+                    'data_length': 0
+                }, 400)
+                return
+            
             try:
                 request_data = json.loads(post_data.decode('utf-8'))
             except json.JSONDecodeError as e:
-                self.send_error_response({'error': 'Invalid JSON', 'details': str(e)}, 400)
+                self.send_error_response({
+                    'error': 'Invalid JSON',
+                    'details': str(e),
+                    'received_data': post_data[:100].decode('utf-8', errors='ignore')
+                }, 400)
                 return
             
             gif_data = request_data.get('gifData')
             settings = request_data.get('settings', {})
             
             if not gif_data:
-                self.send_error_response({'error': 'gifData required'}, 400)
+                self.send_error_response({
+                    'error': 'gifData required',
+                    'received_keys': list(request_data.keys())
+                }, 400)
                 return
             
             # PIL不要のGIF処理
@@ -57,7 +77,8 @@ class handler(BaseHTTPRequestHandler):
                     'success': True,
                     'gifData': processed_gif,
                     'message': 'GIF processed without PIL (simulated)',
-                    'method': 'binary_manipulation'
+                    'method': 'binary_manipulation',
+                    'settings_received': settings
                 }
                 
                 self.send_success_response(result)
@@ -65,13 +86,18 @@ class handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_error_response({
                     'error': 'GIF processing failed',
-                    'details': str(e)
+                    'details': str(e),
+                    'gif_data_length': len(gif_data) if gif_data else 0,
+                    'settings': settings
                 }, 500)
             
         except Exception as e:
+            import traceback
             self.send_error_response({
                 'error': 'Request processing failed',
-                'details': str(e)
+                'details': str(e),
+                'type': type(e).__name__,
+                'traceback': traceback.format_exc().split('\n')[-5:]
             }, 500)
     
     def process_gif_without_pil(self, gif_data, settings):

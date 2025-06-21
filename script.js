@@ -4230,18 +4230,40 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // API診断用関数
-async function testAPI(endpoint = 'gif-gaming') {
+async function testAPI(endpoint = 'gif-gaming', testPost = false) {
     const statusDiv = document.getElementById('apiStatus');
-    statusDiv.innerHTML = `${endpoint} APIテスト中...`;
+    statusDiv.innerHTML = `${endpoint} API${testPost ? ' POST' : ''}テスト中...`;
     
     try {
-        // GETリクエストでAPI状態を確認
-        const response = await fetch(`/api/${endpoint}.py`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
+        let response;
+        
+        if (testPost && endpoint === 'gif-gaming') {
+            // POSTテスト用のダミーデータ
+            const testData = {
+                gifData: 'R0lGODlhAQABAIAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==', // 1x1 透明GIF
+                settings: {
+                    animation_type: 'rainbow',
+                    saturation: 100
+                }
+            };
+            
+            response = await fetch('/api/gif-gaming.py', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(testData)
+            });
+        } else {
+            // GETリクエストでAPI状態を確認
+            response = await fetch(`/api/${endpoint}.py`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+        }
         
         if (response.ok) {
             try {
