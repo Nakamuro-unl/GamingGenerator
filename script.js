@@ -4230,13 +4230,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // API診断用関数
-async function testAPI() {
+async function testAPI(endpoint = 'gif-gaming') {
     const statusDiv = document.getElementById('apiStatus');
-    statusDiv.innerHTML = 'APIテスト中...';
+    statusDiv.innerHTML = `${endpoint} APIテスト中...`;
     
     try {
         // GETリクエストでAPI状態を確認
-        const response = await fetch('/api/gif-gaming.py', {
+        const response = await fetch(`/api/${endpoint}.py`, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json'
@@ -4244,23 +4244,35 @@ async function testAPI() {
         });
         
         if (response.ok) {
-            const data = await response.json();
-            statusDiv.innerHTML = `
-                <div style="color: #90EE90;">✓ API動作中</div>
-                <div>PIL: ${data.pil_available ? '✓' : '✗'}</div>
-                <div>Python: ${data.python_version.split(' ')[0]}</div>
-                ${data.pil_error ? `<div style="color: #FFB6C1;">エラー: ${data.pil_error}</div>` : ''}
-            `;
+            try {
+                const data = await response.json();
+                statusDiv.innerHTML = `
+                    <div style="color: #90EE90;">✓ ${endpoint} API動作中</div>
+                    <div>Status: ${data.status || 'unknown'}</div>
+                    <div>Message: ${data.message || 'no message'}</div>
+                    ${data.pil_available !== undefined ? `<div>PIL: ${data.pil_available ? '✓' : '✗'}</div>` : ''}
+                    ${data.python_version ? `<div>Python: ${data.python_version.split(' ')[0]}</div>` : ''}
+                    ${data.pil_error ? `<div style="color: #FFB6C1;">PIL Error: ${data.pil_error}</div>` : ''}
+                `;
+            } catch (jsonError) {
+                // JSON parsing failed, show raw response
+                const text = await response.text();
+                statusDiv.innerHTML = `
+                    <div style="color: #90EE90;">✓ ${endpoint} 応答あり</div>
+                    <div style="color: #FFB6C1;">JSON Parse Error</div>
+                    <div style="font-size: 9px; max-height: 60px; overflow-y: auto;">${text.substring(0, 200)}${text.length > 200 ? '...' : ''}</div>
+                `;
+            }
         } else {
             statusDiv.innerHTML = `
-                <div style="color: #FFB6C1;">✗ API応答エラー</div>
+                <div style="color: #FFB6C1;">✗ ${endpoint} API応答エラー</div>
                 <div>Status: ${response.status}</div>
                 <div>Error: ${response.statusText}</div>
             `;
         }
     } catch (error) {
         statusDiv.innerHTML = `
-            <div style="color: #FFB6C1;">✗ API接続失敗</div>
+            <div style="color: #FFB6C1;">✗ ${endpoint} API接続失敗</div>
             <div>Error: ${error.message}</div>
         `;
     }
