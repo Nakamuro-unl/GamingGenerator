@@ -132,13 +132,22 @@ class handler(BaseHTTPRequestHandler):
             # フレーム同期: エフェクト1周期をGIF全体で完結させる
             effect_cycle_frames = len(frames)
             
+            # キャンバスサイズを取得（ゲーミングテキスト生成のキャンバスサイズに合わせる）
+            canvas_width = settings.get('canvasWidth', 800)
+            canvas_height = settings.get('canvasHeight', 600)
+            print(f"📐 出力サイズ: {canvas_width}x{canvas_height}")
+            
             for i, frame in enumerate(frames):
                 # フレーム進行度を0-1の範囲で計算（完全同期）
                 frame_progress = i / effect_cycle_frames if effect_cycle_frames > 1 else 0
-                processed_frame = self.apply_gaming_effect(frame, i, len(frames), settings, frame_progress)
+                
+                # フレームをキャンバスサイズにリサイズ
+                resized_frame = self.resize_frame_to_canvas(frame, canvas_width, canvas_height)
+                
+                processed_frame = self.apply_gaming_effect(resized_frame, i, len(frames), settings, frame_progress)
                 processed_frames.append(processed_frame)
                 if i < 5 or i % 5 == 0:
-                    print(f"✅ フレーム {i + 1}/{len(frames)} 完了 (進行度: {frame_progress:.2f}, 同期: {effect_cycle_frames})")
+                    print(f"✅ フレーム {i + 1}/{len(frames)} 完了 (進行度: {frame_progress:.2f}, サイズ: {processed_frame.size})")
             
             # GIF保存
             print("💾 GIF生成中...")
@@ -283,7 +292,7 @@ class handler(BaseHTTPRequestHandler):
         if animation_type == 'rainbow':
             for x in range(0, width, 2):  # ステップ2で高速化
                 effect_color = self.get_rainbow_color(x, 0, width, height, progress, saturation)
-                color = (*effect_color, 150)  # アルファ150
+                color = (*effect_color, 200)  # アルファ値を上げて色味を強化
                 draw.line([(x, 0), (x, height)], fill=color)
                 if x + 1 < width:
                     draw.line([(x + 1, 0), (x + 1, height)], fill=color)
@@ -291,7 +300,7 @@ class handler(BaseHTTPRequestHandler):
         elif animation_type == 'golden':
             for x in range(0, width, 2):
                 effect_color = self.get_golden_color(x, 0, width, height, progress)
-                color = (*effect_color, 150)
+                color = (*effect_color, 200)  # アルファ値を上げて色味を強化
                 draw.line([(x, 0), (x, height)], fill=color)
                 if x + 1 < width:
                     draw.line([(x + 1, 0), (x + 1, height)], fill=color)
@@ -299,7 +308,7 @@ class handler(BaseHTTPRequestHandler):
         elif animation_type == 'bluepurplepink':
             for x in range(0, width, 2):
                 effect_color = self.get_blue_purple_pink_color(x, 0, width, height, progress)
-                color = (*effect_color, 150)
+                color = (*effect_color, 200)  # アルファ値を上げて色味を強化
                 draw.line([(x, 0), (x, height)], fill=color)
                 if x + 1 < width:
                     draw.line([(x + 1, 0), (x + 1, height)], fill=color)
@@ -333,7 +342,7 @@ class handler(BaseHTTPRequestHandler):
                         else:
                             effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
                         
-                        overlay_pixels.append((*effect_color, 150))
+                        overlay_pixels.append((*effect_color, 200))  # アルファ値を上げて色味を強化
                 
                 overlay.putdata(overlay_pixels)
         
@@ -353,7 +362,7 @@ class handler(BaseHTTPRequestHandler):
                 if len(pixel) == 4 and pixel[3] == 0:
                     effect_pixels.append(0)  # 透過部分は効果なし
                 else:
-                    effect_pixels.append(int(255 * 0.6))  # 60%の強度
+                    effect_pixels.append(int(255 * 0.8))  # 80%の強度（静止画と統一）
             effect_mask.putdata(effect_pixels)
             
             # 最終合成
@@ -520,3 +529,32 @@ class handler(BaseHTTPRequestHandler):
             r, g, b = c, 0, x_val
         
         return (r, g, b)
+    
+    def resize_frame_to_canvas(self, frame, canvas_width, canvas_height):
+        """フレームをキャンバスサイズに合わせてリサイズ"""
+        # アスペクト比を保持してリサイズ
+        frame_width, frame_height = frame.size
+        frame_aspect = frame_width / frame_height
+        canvas_aspect = canvas_width / canvas_height
+        
+        if canvas_aspect > frame_aspect:
+            # キャンバスが横長の場合、高さを基準にリサイズ
+            new_height = canvas_height
+            new_width = int(new_height * frame_aspect)
+        else:
+            # キャンバスが縦長の場合、幅を基準にリサイズ
+            new_width = canvas_width
+            new_height = int(new_width / frame_aspect)
+        
+        # リサイズしてキャンバスサイズの画像を作成
+        resized_frame = frame.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        # キャンバスサイズの透明背景を作成
+        canvas_frame = Image.new('RGBA', (canvas_width, canvas_height), (0, 0, 0, 0))
+        
+        # 中央に配置
+        x_offset = (canvas_width - new_width) // 2
+        y_offset = (canvas_height - new_height) // 2
+        canvas_frame.paste(resized_frame, (x_offset, y_offset), resized_frame if resized_frame.mode == 'RGBA' else None)
+        
+        return canvas_frame
