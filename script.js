@@ -3998,6 +3998,13 @@ class GamingTextGenerator {
         // キャンバスをクリア
         this.textCtx.clearRect(0, 0, this.textCanvas.width, this.textCanvas.height);
         
+        // GIFのフレーム数取得（推定）
+        const estimatedFrameCount = this.gifFrames[0]?.estimatedFrameCount || 10;
+        
+        // フレーム同期: GIFアニメーションのフレーム数に合わせてゲーミング効果を同期
+        const frameSync = currentTime ? (currentTime / 100) % estimatedFrameCount : 0;
+        const frameSyncProgress = frameSync / estimatedFrameCount;
+        
         // 元のGIF画像を描画（アニメーション効果）
         this.textCtx.save();
         
@@ -4033,18 +4040,18 @@ class GamingTextGenerator {
         // GIF画像を描画
         this.textCtx.drawImage(this.uploadedImage, drawX, drawY, drawWidth, drawHeight);
         
-        // ゲーミング効果をオーバーレイとして適用
-        this.applyGamingOverlayToCanvas(animationMode, timeOffset);
+        // ゲーミング効果をオーバーレイとして適用（フレーム同期）
+        this.applyGamingOverlayToCanvas(animationMode, timeOffset, frameSyncProgress);
         
         this.textCtx.restore();
     }
 
-    applyGamingOverlayToCanvas(animationMode, timeOffset) {
+    applyGamingOverlayToCanvas(animationMode, timeOffset, frameSyncProgress = 0) {
         const width = this.textCanvas.width;
         const height = this.textCanvas.height;
         
-        // アニメーション進行度
-        const progress = timeOffset || 0;
+        // フレーム同期されたアニメーション進行度
+        const progress = frameSyncProgress > 0 ? frameSyncProgress * 10 : (timeOffset || 0);
         
         // エフェクト別の描画
         this.textCtx.save();

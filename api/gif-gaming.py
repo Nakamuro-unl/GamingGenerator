@@ -124,15 +124,21 @@ class handler(BaseHTTPRequestHandler):
                 self.send_error_response(error_response, 400)
                 return
             
-            # 各フレームにゲーミング効果を適用
+            # 各フレームにゲーミング効果を適用（フレーム数に基づく同期）
             print("🎨 フレーム処理開始...")
+            print(f"🎞️ 総フレーム数: {len(frames)} - エフェクトループを同期")
             processed_frames = []
             
+            # フレーム同期: エフェクト1周期をGIF全体で完結させる
+            effect_cycle_frames = len(frames)
+            
             for i, frame in enumerate(frames):
-                processed_frame = self.apply_gaming_effect(frame, i, len(frames), settings)
+                # フレーム進行度を0-1の範囲で計算（完全同期）
+                frame_progress = i / effect_cycle_frames if effect_cycle_frames > 1 else 0
+                processed_frame = self.apply_gaming_effect(frame, i, len(frames), settings, frame_progress)
                 processed_frames.append(processed_frame)
                 if i < 5 or i % 5 == 0:
-                    print(f"✅ フレーム {i + 1}/{len(frames)} 完了")
+                    print(f"✅ フレーム {i + 1}/{len(frames)} 完了 (進行度: {frame_progress:.2f}, 同期: {effect_cycle_frames})")
             
             # GIF保存
             print("💾 GIF生成中...")
@@ -250,15 +256,20 @@ class handler(BaseHTTPRequestHandler):
         
         return frames, durations
     
-    def apply_gaming_effect(self, frame, frame_index, total_frames, settings):
-        """ゲーミング効果をフレームに適用（透過部分を除く）"""
+    def apply_gaming_effect(self, frame, frame_index, total_frames, settings, frame_progress=None):
+        """ゲーミング効果をフレームに適用（透過部分を除く、フレーム同期）"""
         animation_type = settings.get('animationType', 'rainbow')
         speed = settings.get('speed', 5)
         saturation = settings.get('saturation', 100)
         concentration_lines = settings.get('concentrationLines', False)
         
-        # アニメーション進行度
-        progress = (frame_index / total_frames) * speed
+        # フレーム同期されたアニメーション進行度
+        if frame_progress is not None:
+            # GIFのフレーム数に基づいて1周期で完結するように調整
+            progress = frame_progress * speed * 10  # speed倍率でエフェクト速度調整
+        else:
+            # 従来の方式（フォールバック）
+            progress = (frame_index / total_frames) * speed
         
         # 結果画像を作成
         result = Image.new('RGBA', frame.size)
@@ -294,29 +305,37 @@ class handler(BaseHTTPRequestHandler):
                     draw.line([(x + 1, 0), (x + 1, height)], fill=color)
                     
         else:
-            # その他のエフェクトはピクセル単位処理（より高速化版）
-            frame_array = list(frame.getdata())
-            overlay_pixels = []
-            
-            for i, pixel in enumerate(frame_array):
-                x = i % width
-                y = i // width
+            # その他のエフェクトは高速ライン描画で処理
+            if animation_type == 'rainbowPulse':
+                # rainbowPulseは特別に高速化
+                for x in range(0, width, 4):  # ステップ4で更に高速化
+                    effect_color = self.get_rainbow_pulse_color(x, height//2, width, height, progress, saturation)
+                    color = (*effect_color, 120)  # アルファ値を下げて軽量化
+                    for dx in range(4):
+                        if x + dx < width:
+                            draw.line([(x + dx, 0), (x + dx, height)], fill=color)
+            else:
+                # その他のエフェクトはピクセル単位処理（高速化版）
+                frame_array = list(frame.getdata())
+                overlay_pixels = []
                 
-                if len(pixel) == 4 and pixel[3] == 0:  # 透過
-                    overlay_pixels.append((0, 0, 0, 0))
-                else:
-                    if animation_type == 'concentration':
-                        effect_color = self.get_concentration_color(x, y, width, height, progress)
-                    elif animation_type == 'pulse':
-                        effect_color = self.get_pulse_color(x, y, width, height, progress, saturation)
-                    elif animation_type == 'rainbowPulse':
-                        effect_color = self.get_rainbow_pulse_color(x, y, width, height, progress, saturation)
-                    else:
-                        effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
+                for i, pixel in enumerate(frame_array):
+                    x = i % width
+                    y = i // width
                     
-                    overlay_pixels.append((*effect_color, 150))
-            
-            overlay.putdata(overlay_pixels)
+                    if len(pixel) == 4 and pixel[3] == 0:  # 透過
+                        overlay_pixels.append((0, 0, 0, 0))
+                    else:
+                        if animation_type == 'concentration':
+                            effect_color = self.get_concentration_color(x, y, width, height, progress)
+                        elif animation_type == 'pulse':
+                            effect_color = self.get_pulse_color(x, y, width, height, progress, saturation)
+                        else:
+                            effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
+                        
+                        overlay_pixels.append((*effect_color, 150))
+                
+                overlay.putdata(overlay_pixels)
         
         # 高速アルファブレンド
         try:
@@ -349,8 +368,9 @@ class handler(BaseHTTPRequestHandler):
         return result
     
     def get_rainbow_color(self, x, y, width, height, progress, saturation):
-        """虹色エフェクト計算"""
-        hue = int((x / width * 360 + progress * 36) % 360)
+        """虹色エフェクト計算（フレーム同期）"""
+        # フレーム同期: 1周期で360度完結
+        hue = int((x / width * 360 + progress * 360) % 360)
         saturation_val = min(255, int(saturation * 2.55))
         
         # HSVからRGBに変換
@@ -374,11 +394,12 @@ class handler(BaseHTTPRequestHandler):
         return (r, g, b)
     
     def get_golden_color(self, x, y, width, height, progress):
-        """金ピカエフェクト計算"""
+        """金ピカエフェクト計算（フレーム同期）"""
         base_hue = 45
-        hue_variation = int(math.sin(progress + x * 0.02) * 20)
+        # フレーム同期: 1周期で完結
+        hue_variation = int(math.sin(progress * 2 * math.pi + x * 0.02) * 20)
         
-        lightness = int(127 + math.sin(progress * 2 + x * 0.02) * 50)
+        lightness = int(127 + math.sin(progress * 4 * math.pi + x * 0.02) * 50)
         
         r = min(255, lightness + 50)
         g = min(255, lightness)
@@ -387,7 +408,7 @@ class handler(BaseHTTPRequestHandler):
         return (r, g, b)
     
     def get_concentration_color(self, x, y, width, height, progress):
-        """集中線エフェクト計算"""
+        """集中線エフェクト計算（フレーム同期）"""
         center_x = width / 2
         center_y = height / 2
         
@@ -395,8 +416,8 @@ class handler(BaseHTTPRequestHandler):
         angle = math.atan2(y - center_y, x - center_x)
         distance = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
         
-        # 集中線パターン
-        line_intensity = abs(math.sin(angle * 8 + progress * 2))
+        # フレーム同期: 集中線パターン
+        line_intensity = abs(math.sin(angle * 8 + progress * 2 * math.pi))
         fade = max(0, 1 - distance / max(width, height))
         
         intensity = int(line_intensity * fade * 255)
@@ -405,9 +426,9 @@ class handler(BaseHTTPRequestHandler):
         return (intensity, intensity, intensity)
     
     def get_blue_purple_pink_color(self, x, y, width, height, progress):
-        """ピンク・青グラデーション効果計算"""
-        # 横方向のグラデーション位置
-        pos = (x / width + progress * 0.1) % 1.0
+        """ピンク・青グラデーション効果計算（フレーム同期）"""
+        # フレーム同期: 横方向のグラデーション位置
+        pos = (x / width + progress) % 1.0
         
         if pos < 0.33:
             # 青からピンクへ
@@ -431,18 +452,18 @@ class handler(BaseHTTPRequestHandler):
         return (r, g, b)
     
     def get_pulse_color(self, x, y, width, height, progress, saturation):
-        """パルス効果計算"""
+        """パルス効果計算（フレーム同期）"""
         # 中心からの距離でパルス効果
         center_x = width / 2
         center_y = height / 2
         distance = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
         max_distance = math.sqrt(center_x ** 2 + center_y ** 2)
         
-        # パルス波
-        pulse = abs(math.sin(progress * 3 - distance / max_distance * 6))
+        # フレーム同期: パルス波
+        pulse = abs(math.sin(progress * 2 * math.pi * 3 - distance / max_distance * 6))
         
-        # 虹色をベースにパルス強度を適用
-        hue = int((distance / max_distance * 360 + progress * 36) % 360)
+        # 虹色をベースにパルス強度を適用（フレーム同期）
+        hue = int((distance / max_distance * 360 + progress * 360) % 360)
         intensity = int(pulse * saturation * 2.55)
         
         # HSVからRGB変換（簡易版）
@@ -466,21 +487,36 @@ class handler(BaseHTTPRequestHandler):
         return (r, g, b)
     
     def get_rainbow_pulse_color(self, x, y, width, height, progress, saturation):
-        """レインボーパルス効果計算"""
-        # 虹色グラデーション
-        rainbow_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
+        """レインボーパルス効果計算（フレーム同期・最適化版）"""
+        # 高速化: 虹色計算を簡略化
+        hue = int((x / width * 360 + progress * 360) % 360)
+        saturation_val = min(255, int(saturation * 2.55))
         
-        # パルス効果
+        # 高速化: パルス効果の計算を簡略化
         center_x = width / 2
         center_y = height / 2
-        distance = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
-        max_distance = math.sqrt(center_x ** 2 + center_y ** 2)
+        # 距離計算を簡略化
+        distance_norm = abs(x - center_x) / center_x + abs(y - center_y) / center_y
         
-        pulse = abs(math.sin(progress * 4 - distance / max_distance * 8)) * 0.7 + 0.3
+        # フレーム同期: パルス効果（計算を簡略化）
+        pulse = abs(math.sin(progress * 2 * math.pi * 2 - distance_norm * 4)) * 0.5 + 0.5
         
-        # 虹色にパルス効果を適用
-        r = int(rainbow_color[0] * pulse)
-        g = int(rainbow_color[1] * pulse)
-        b = int(rainbow_color[2] * pulse)
+        # HSVからRGBに変換（最適化版）
+        h = hue / 60.0
+        c = int(saturation_val * pulse)
+        x_val = int(c * (1 - abs((h % 2) - 1)))
+        
+        if 0 <= h < 1:
+            r, g, b = c, x_val, 0
+        elif 1 <= h < 2:
+            r, g, b = x_val, c, 0
+        elif 2 <= h < 3:
+            r, g, b = 0, c, x_val
+        elif 3 <= h < 4:
+            r, g, b = 0, x_val, c
+        elif 4 <= h < 5:
+            r, g, b = x_val, 0, c
+        else:
+            r, g, b = c, 0, x_val
         
         return (r, g, b)
