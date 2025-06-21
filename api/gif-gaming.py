@@ -403,41 +403,36 @@ class handler(BaseHTTPRequestHandler):
                 if x + 1 < width:
                     draw.line([(x + 1, 0), (x + 1, height)], fill=color)
                     
+        elif animation_type == 'rainbowPulse':
+            # rainbowPulseは特別に高速化
+            for x in range(0, width, 4):  # ステップ4で更に高速化
+                effect_color = self.get_rainbow_pulse_color(x, height//2, width, height, progress, saturation)
+                color = (*effect_color, 120)  # アルファ値を下げて軽量化
+                for dx in range(4):
+                    if x + dx < width:
+                        draw.line([(x + dx, 0), (x + dx, height)], fill=color)
         else:
-            # その他のエフェクトは高速ライン描画で処理
-            if animation_type == 'rainbowPulse':
-                # rainbowPulseは特別に高速化
-                for x in range(0, width, 4):  # ステップ4で更に高速化
-                    effect_color = self.get_rainbow_pulse_color(x, height//2, width, height, progress, saturation)
-                    color = (*effect_color, 120)  # アルファ値を下げて軽量化
-                    for dx in range(4):
-                        if x + dx < width:
-                            draw.line([(x + dx, 0), (x + dx, height)], fill=color)
-            else:
-                # その他のエフェクトはピクセル単位処理（高速化版）
-                frame_array = list(frame.getdata())
-                overlay_pixels = []
+            # その他のエフェクトはピクセル単位処理（高速化版）
+            frame_array = list(frame.getdata())
+            overlay_pixels = []
+            
+            for i, pixel in enumerate(frame_array):
+                x = i % width
+                y = i // width
                 
-                for i, pixel in enumerate(frame_array):
-                    x = i % width
-                    y = i // width
-                    
-                    if len(pixel) == 4 and pixel[3] == 0:  # 透過
-                        overlay_pixels.append((0, 0, 0, 0))
+                if len(pixel) == 4 and pixel[3] == 0:  # 透過
+                    overlay_pixels.append((0, 0, 0, 0))
+                else:
+                    if animation_type == 'concentration':
+                        effect_color = self.get_concentration_color(x, y, width, height, progress)
+                    elif animation_type == 'pulse':
+                        effect_color = self.get_pulse_color(x, y, width, height, progress, saturation)
                     else:
-                        if animation_type == 'concentration':
-                            effect_color = self.get_concentration_color(x, y, width, height, progress)
-                        elif animation_type == 'pulse':
-                            effect_color = self.get_pulse_color(x, y, width, height, progress, saturation)
-                        elif animation_type == 'rainbow':
-                            # rainbowは上記の最適化処理を使用するため、ここでは基本色を返す
-                            effect_color = (255, 255, 255)
-                        else:
-                            effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
-                        
-                        overlay_pixels.append((*effect_color, 220))  # アルファ値を更に強化
-                
-                overlay.putdata(overlay_pixels)
+                        effect_color = self.get_rainbow_color(x, y, width, height, progress, saturation)
+                    
+                    overlay_pixels.append((*effect_color, 220))  # アルファ値を更に強化
+            
+            overlay.putdata(overlay_pixels)
         
         # 高速アルファブレンド
         try:
