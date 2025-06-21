@@ -4227,4 +4227,46 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 初期メモリ状況を表示
     window.debugGaming.checkMemory();
-}); 
+});
+
+// API診断用関数
+async function testAPI() {
+    const statusDiv = document.getElementById('apiStatus');
+    statusDiv.innerHTML = 'APIテスト中...';
+    
+    try {
+        // GETリクエストでAPI状態を確認
+        const response = await fetch('/api/gif-gaming.py', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            statusDiv.innerHTML = `
+                <div style="color: #90EE90;">✓ API動作中</div>
+                <div>PIL: ${data.pil_available ? '✓' : '✗'}</div>
+                <div>Python: ${data.python_version.split(' ')[0]}</div>
+                ${data.pil_error ? `<div style="color: #FFB6C1;">エラー: ${data.pil_error}</div>` : ''}
+            `;
+        } else {
+            statusDiv.innerHTML = `
+                <div style="color: #FFB6C1;">✗ API応答エラー</div>
+                <div>Status: ${response.status}</div>
+                <div>Error: ${response.statusText}</div>
+            `;
+        }
+    } catch (error) {
+        statusDiv.innerHTML = `
+            <div style="color: #FFB6C1;">✗ API接続失敗</div>
+            <div>Error: ${error.message}</div>
+        `;
+    }
+}
+
+function toggleDiagnostics() {
+    const panel = document.getElementById('apiDiagnostics');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+} 
