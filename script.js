@@ -3529,7 +3529,13 @@ class GamingTextGenerator {
                 saturation: parseInt(this.textSaturation.value) || 100,
                 concentrationLines: this.textAnimationMode.value === 'concentration',
                 canvasWidth: this.textCanvas.width,
-                canvasHeight: this.textCanvas.height
+                canvasHeight: this.textCanvas.height,
+                // グラデーション関連設定を追加
+                gradientDirection: this.textGradientDirection ? this.textGradientDirection.value : 'horizontal',
+                gradientDensity: this.textGradientDensity ? parseFloat(this.textGradientDensity.value) : 7.0,
+                // 背景設定
+                transparentBg: this.textBgTransparent ? this.textBgTransparent.checked : false,
+                backgroundColor: this.textBgColor ? this.textBgColor.value : '#000000'
             };
             
             console.log('📊 GIF処理設定:', settings);

@@ -320,8 +320,9 @@ class handler(BaseHTTPRequestHandler):
             normalized_time = (progress % 1 + 1) % 1  # 0-1の範囲
             color_shift = normalized_time * len(gaming_colors)
             
-            # グラデーション密度（クライアントサイドのデフォルト値）
-            gradient_density = 7.0
+            # グラデーション設定（クライアントサイドから取得）
+            gradient_direction = settings.get('gradientDirection', 'horizontal')
+            gradient_density = settings.get('gradientDensity', 7.0)
             
             # 彩度レベル（クライアントサイド準拠）
             saturation_level = saturation / 100.0
@@ -338,8 +339,19 @@ class handler(BaseHTTPRequestHandler):
                     original_r, original_g, original_b = pixel[0], pixel[1], pixel[2]
                     original_a = pixel[3] if len(pixel) == 4 else 255
                     
-                    # 水平方向のグラデーション位置（クライアントサイドと同じ）
-                    position = x / width
+                    # グラデーション方向に基づく位置計算（クライアントサイドと同じ）
+                    if gradient_direction == 'horizontal':
+                        position = x / width
+                    elif gradient_direction == 'vertical':
+                        position = y / height
+                    elif gradient_direction == 'diagonal1':  # 左上から右下
+                        center_x, center_y = width / 2, height / 2
+                        position = ((x - center_x) + (y - center_y) + width + height) / (2 * (width + height))
+                    elif gradient_direction == 'diagonal2':  # 右上から左下
+                        center_x, center_y = width / 2, height / 2
+                        position = ((center_x - x) + (y - center_y) + width + height) / (2 * (width + height))
+                    else:
+                        position = x / width  # デフォルトは水平
                     
                     # グラデーション密度を適用してカラーインデックスを計算
                     color_float = (position * gradient_density + color_shift) % len(gaming_colors)
