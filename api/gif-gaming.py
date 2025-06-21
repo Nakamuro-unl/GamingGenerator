@@ -290,42 +290,61 @@ class handler(BaseHTTPRequestHandler):
         
         # エフェクト別の描画
         if animation_type == 'rainbow':
-            # クライアントサイドと同じ虹色配列を使用
-            gaming_colors = [
-                (255, 0, 0),     # 赤
-                (255, 128, 0),   # オレンジ
-                (255, 255, 0),   # 黄
-                (0, 255, 0),     # 緑
-                (0, 128, 255),   # 青
-                (64, 0, 255),    # 藍
-                (128, 0, 255)    # 紫
-            ]
+            # クライアントサイドと同じHSL色相シフト処理を使用
+            # ピクセル単位でHSL変換して滑らかなグラデーションを実現
+            frame_array = list(frame.getdata())
+            overlay_pixels = []
             
-            # 彩度調整
-            if saturation != 100:
-                saturation_factor = saturation / 100.0
-                gaming_colors = [
-                    (
-                        int(r * saturation_factor + 128 * (1 - saturation_factor)),
-                        int(g * saturation_factor + 128 * (1 - saturation_factor)),
-                        int(b * saturation_factor + 128 * (1 - saturation_factor))
-                    ) for r, g, b in gaming_colors
-                ]
+            # 彩度レベル調整
+            saturation_level = saturation / 100.0
             
-            # 時間ベースの色選択
+            # パルス効果の計算
+            pulse = math.sin(progress * 2 * math.pi * 3)
+            pulse_intensity = 0.6 + (abs(pulse) * 0.4)  # 0.6-1.0の範囲
+            
+            # 基本速度
             base_speed = 2.0
-            color_index = int(abs(progress * base_speed)) % len(gaming_colors)
-            current_color = gaming_colors[color_index]
+            hue_shift = abs(progress * base_speed) % 1  # 0-1の範囲
             
-            # グラデーション幅をクライアントサイドと統一（1ピクセル単位）
-            for x in range(width):
-                # X位置に基づくグラデーション（クライアントサイドロジックと統一）
-                gradient_pos = (x / width + progress) % 1.0
-                gradient_color_index = int(gradient_pos * len(gaming_colors)) % len(gaming_colors)
-                effect_color = gaming_colors[gradient_color_index]
+            for i, pixel in enumerate(frame_array):
+                x = i % width
+                y = i // width
                 
-                color = (*effect_color, 220)  # アルファ値を更に強化
-                draw.line([(x, 0), (x, height)], fill=color)
+                if len(pixel) == 4 and pixel[3] == 0:  # 透過
+                    overlay_pixels.append((0, 0, 0, 0))
+                else:
+                    # 元画像の色を取得
+                    original_r, original_g, original_b = pixel[0], pixel[1], pixel[2]
+                    
+                    # RGBからHSLに変換
+                    original_hsl = self.rgb_to_hsl(original_r, original_g, original_b)
+                    
+                    # 色相をシフト
+                    new_hue = (original_hsl[0] + hue_shift) % 1.0
+                    
+                    # 彩度を調整（元の彩度をベースに強化）
+                    new_saturation = original_hsl[1]
+                    if new_saturation < 0.3:
+                        new_saturation = min(0.8, new_saturation + 0.4) * saturation_level
+                    else:
+                        new_saturation = min(1.0, new_saturation * 1.2) * saturation_level
+                    
+                    # 明度を調整
+                    new_lightness = original_hsl[2]
+                    if original_hsl[2] < 0.2:
+                        new_lightness = min(0.6, original_hsl[2] * 1.5)
+                    elif original_hsl[2] > 0.8:
+                        new_lightness = max(0.4, original_hsl[2] * 0.9)
+                    
+                    # パルス効果を適用
+                    new_lightness = max(0.1, min(0.9, new_lightness * pulse_intensity))
+                    
+                    # HSLからRGBに変換
+                    new_rgb = self.hsl_to_rgb(new_hue, new_saturation, new_lightness)
+                    
+                    overlay_pixels.append((*new_rgb, 200))  # アルファ値を適切に設定
+            
+            overlay.putdata(overlay_pixels)
                     
         elif animation_type == 'golden':
             for x in range(0, width, 2):
@@ -591,3 +610,68 @@ class handler(BaseHTTPRequestHandler):
         canvas_frame.paste(resized_frame, (x_offset, y_offset), resized_frame if resized_frame.mode == 'RGBA' else None)
         
         return canvas_frame
+    
+    def rgb_to_hsl(self, r, g, b):
+        """RGBからHSLに変換（クライアントサイドと同じロジック）"""
+        r, g, b = r / 255.0, g / 255.0, b / 255.0
+        max_val = max(r, g, b)
+        min_val = min(r, g, b)
+        diff = max_val - min_val
+        
+        # 明度
+        lightness = (max_val + min_val) / 2.0
+        
+        if diff == 0:
+            hue = 0
+            saturation = 0
+        else:
+            # 彩度
+            if lightness < 0.5:
+                saturation = diff / (max_val + min_val)
+            else:
+                saturation = diff / (2.0 - max_val - min_val)
+            
+            # 色相
+            if max_val == r:
+                hue = (g - b) / diff + (6 if g < b else 0)
+            elif max_val == g:
+                hue = (b - r) / diff + 2
+            else:
+                hue = (r - g) / diff + 4
+            hue /= 6.0
+        
+        return (hue, saturation, lightness)
+    
+    def hsl_to_rgb(self, h, s, l):
+        """HSLからRGBに変換（クライアントサイドと同じロジック）"""
+        if s == 0:
+            r = g = b = l  # 無彩色
+        else:
+            def hue_to_rgb(p, q, t):
+                if t < 0:
+                    t += 1
+                if t > 1:
+                    t -= 1
+                if t < 1/6:
+                    return p + (q - p) * 6 * t
+                if t < 1/2:
+                    return q
+                if t < 2/3:
+                    return p + (q - p) * (2/3 - t) * 6
+                return p
+            
+            if l < 0.5:
+                q = l * (1 + s)
+            else:
+                q = l + s - l * s
+            p = 2 * l - q
+            
+            r = hue_to_rgb(p, q, h + 1/3)
+            g = hue_to_rgb(p, q, h)
+            b = hue_to_rgb(p, q, h - 1/3)
+        
+        return (
+            max(0, min(255, round(r * 255))),
+            max(0, min(255, round(g * 255))),
+            max(0, min(255, round(b * 255)))
+        )
