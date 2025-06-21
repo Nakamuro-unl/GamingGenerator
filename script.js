@@ -3515,46 +3515,20 @@ class GamingTextGenerator {
             
             this.textDownloadGifBtn.textContent = 'サーバー処理中...';
             
-            // Vercel APIを呼び出し
-            // 現在のドメインを優先してAPIを呼び出し（CORS回避）
-            const currentDomain = window.location.origin;
-            const apiUrls = [
-                currentDomain, // 現在のドメイン（CORS回避）
-                'https://gaming-generator-qjlika608-nakamuros-projects-f99bfc51.vercel.app', // 最新
-                'https://gaming-generator-kdcyoa64v-nakamuros-projects-f99bfc51.vercel.app', // 以前
-                'https://gaming-generator.vercel.app' // カスタムドメイン候補
-            ];
+            // Vercel APIを呼び出し（相対パスを使用してCORSを回避）
+            const response = await fetch('/api/gif-gaming.py', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gifData: base64Data,
+                    settings: settings
+                })
+            });
             
-            
-            let response = null;
-            let lastError = null;
-            
-            for (const apiUrl of apiUrls) {
-                try {
-                    response = await fetch(`${apiUrl}/api/gif-gaming.py`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            gifData: base64Data,
-                            settings: settings
-                        })
-                    });
-                    
-                    if (response.ok) {
-                        break; // 成功したのでループを抜ける
-                    } else {
-                        throw new Error(`API Error: ${response.status} ${response.statusText}`);
-                    }
-                } catch (error) {
-                    lastError = error;
-                    response = null;
-                }
-            }
-            
-            if (!response || !response.ok) {
-                throw lastError || new Error('すべてのAPIエンドポイントで接続に失敗しました');
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status} ${response.statusText}`);
             }
             
             const result = await response.json();

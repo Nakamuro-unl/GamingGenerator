@@ -285,7 +285,7 @@ export class GIFProcessor {
             formData.append('settings', JSON.stringify(settings));
 
             const response = await ErrorHandler.withTimeout(
-                fetch(Config.API.gifProcessing, {
+                fetch('/api/gif-gaming.py', {
                     method: 'POST',
                     body: formData
                 }),

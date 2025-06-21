@@ -3,13 +3,40 @@ GIFアニメーションにゲーミング効果を適用するAPI
 """
 
 from http.server import BaseHTTPRequestHandler
-from PIL import Image, ImageDraw, ImageSequence
 import io
 import base64
 import json
 import math
 
+try:
+    from PIL import Image, ImageDraw, ImageSequence
+    PIL_AVAILABLE = True
+except ImportError as e:
+    PIL_AVAILABLE = False
+    PIL_ERROR = str(e)
+
 class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        """デバッグ用GETエンドポイント"""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Credentials', 'true')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
+        self.send_header('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version')
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        
+        status_data = {
+            'status': 'ok',
+            'message': 'GIF Gaming API is running',
+            'pil_available': PIL_AVAILABLE,
+            'pil_error': PIL_ERROR if not PIL_AVAILABLE else None,
+            'timestamp': '2024-01-01T00:00:00Z'
+        }
+        
+        response_data = json.dumps(status_data).encode('utf-8')
+        self.wfile.write(response_data)
+    
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Credentials', 'true')
@@ -20,6 +47,14 @@ class handler(BaseHTTPRequestHandler):
     
     def do_POST(self):
         try:
+            # PILの可用性をチェック
+            if not PIL_AVAILABLE:
+                error_response = {
+                    'error': 'PIL (Pillow) library is not available',
+                    'details': PIL_ERROR
+                }
+                self.send_error_response(error_response, 500)
+                return
             
             # リクエストボディを読み取り
             content_length = int(self.headers.get('Content-Length', 0))
@@ -183,6 +218,10 @@ class handler(BaseHTTPRequestHandler):
     
     def send_error_response(self, data, status_code):
         self.send_response(status_code)
+        self.send_header('Access-Control-Allow-Credentials', 'true')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
+        self.send_header('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version')
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
         

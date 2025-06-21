@@ -89,6 +89,7 @@ export class Config {
      */
     static API = {
         gifProcessing: '/api/gif-gaming.py',
+        test: '/api/test.py',
         timeout: 30000,
         retryAttempts: 3
     };
