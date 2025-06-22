@@ -3540,6 +3540,11 @@ class GamingTextGenerator {
             }
             
             
+            // レスポンス内容をデバッグ出力
+            console.log('API Response:', result);
+            console.log('gifData type:', typeof result.gifData);
+            console.log('gifData length:', result.gifData ? result.gifData.length : 'undefined');
+            
             // 結果をダウンロード
             const blob = this.base64ToBlob(result.gifData);
             const url = URL.createObjectURL(blob);
