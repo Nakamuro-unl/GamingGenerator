@@ -3542,8 +3542,16 @@ class GamingTextGenerator {
             
             // レスポンス内容をデバッグ出力
             console.log('API Response:', result);
+            console.log('Response keys:', Object.keys(result));
             console.log('gifData type:', typeof result.gifData);
             console.log('gifData length:', result.gifData ? result.gifData.length : 'undefined');
+            
+            // gifDataが存在しない場合はエラーとして処理
+            if (!result.gifData) {
+                const error = new Error('API response does not contain gifData');
+                error.serverData = result;
+                throw error;
+            }
             
             // 結果をダウンロード
             const blob = this.base64ToBlob(result.gifData);

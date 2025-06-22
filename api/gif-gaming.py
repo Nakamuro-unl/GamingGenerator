@@ -48,7 +48,7 @@ class handler(BaseHTTPRequestHandler):
             # リクエストボディを読み取り（安全に）
             if content_length > 0:
                 try:
-                    post_data = self.rfile.read(min(content_length, 1000))  # 最大1000バイトまで
+                    post_data = self.rfile.read(content_length)  # 全データを読み込む
                     debug_response['has_body'] = True
                     debug_response['body_length'] = len(post_data)
                     
