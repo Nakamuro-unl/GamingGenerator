@@ -62,6 +62,10 @@ class handler(BaseHTTPRequestHandler):
                         if 'gifData' in request_data:
                             debug_response['gif_data_present'] = True
                             debug_response['gif_data_length'] = len(request_data['gifData'])
+                            # デバッグ用：元のGIFデータをそのまま返す
+                            debug_response['success'] = True
+                            debug_response['gifData'] = request_data['gifData']
+                            debug_response['message'] = 'GIF data echoed back (no processing applied)'
                         else:
                             debug_response['gif_data_present'] = False
                             

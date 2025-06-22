@@ -3692,6 +3692,11 @@ class GamingTextGenerator {
     
     // Base64をBlobに変換
     base64ToBlob(base64Data) {
+        // base64Dataの安全性チェック
+        if (!base64Data || typeof base64Data !== 'string') {
+            throw new Error('Invalid base64 data provided');
+        }
+        
         // Data URLの場合はカンマで分割、そうでなければそのまま使用
         const base64String = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
         const byteCharacters = atob(base64String);
