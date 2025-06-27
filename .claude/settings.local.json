@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(rg:*)",
+      "Bash(python3:*)",
+      "Bash(chmod:*)",
+      "Bash(pip3 install:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(find:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(pkill:*)",
+      "Bash(ls:*)",
+      "Bash(sed:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(rm:*)"
+    ],
+    "deny": []
+  }
+}

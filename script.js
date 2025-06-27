@@ -1110,6 +1110,10 @@ class GamingTextGenerator {
         this.startTime = null;
         this.capturedFrames = [];
         
+        // 作成モードを初期化
+        this.creationMode = 'text'; // デフォルトはテキストモード
+        this.gifFrames = null;
+        
         // キャンバスの背景を透明に設定
         this.textCtx.globalCompositeOperation = 'source-over';
         
@@ -1183,10 +1187,20 @@ class GamingTextGenerator {
         this.textGradientDirection.addEventListener('change', () => this.autoGeneratePreview());
         this.textAnimationSpeed.addEventListener('input', (e) => {
             this.textAnimationSpeedValue.textContent = e.target.value;
+            // GIFプレビューの場合は速度変更を反映
+            if (this.creationMode === 'image' && this.gifFrames && this.gifFrames.length > 0) {
+                // GIFプレビューを再起動して新しい速度を反映
+                this.startGifPreview();
+            }
         });
         this.textSaturation.addEventListener('input', (e) => {
             this.textSaturationValue.textContent = e.target.value + '%';
-            this.autoGeneratePreview();
+            // GIFプレビューの場合はGIFプレビューを更新
+            if (this.creationMode === 'image' && this.gifFrames && this.gifFrames.length > 0) {
+                this.startGifPreview();
+            } else {
+                this.autoGeneratePreview();
+            }
         });
         this.textGradientDensity.addEventListener('input', (e) => {
             this.textGradientDensityValue.textContent = e.target.value;
@@ -1216,6 +1230,9 @@ class GamingTextGenerator {
         this.modeText.addEventListener('change', () => this.handleModeChange());
         this.modeImage.addEventListener('change', () => this.handleModeChange());
         
+        // 初期モードを設定
+        this.updateCreationMode();
+        
         // 初期状態のUI表示設定
         this.handleAnimationModeChange();
         
@@ -1224,6 +1241,8 @@ class GamingTextGenerator {
     }
 
     handleModeChange() {
+        this.updateCreationMode();
+        
         if (this.modeText.checked) {
             // テキストモードに切り替え
             this.textInputGroup.style.display = 'block';
@@ -1231,12 +1250,22 @@ class GamingTextGenerator {
             // 画像をクリア
             this.uploadedImage = null;
             this.textImageInput.value = '';
+            this.gifFrames = null;
         } else {
             // 画像モードに切り替え
             this.textInputGroup.style.display = 'none';
             this.imageInputGroup.style.display = 'block';
         }
         this.autoGeneratePreview();
+    }
+    
+    updateCreationMode() {
+        // ラジオボタンの状態から作成モードを更新
+        if (this.modeText.checked) {
+            this.creationMode = 'text';
+        } else if (this.modeImage.checked) {
+            this.creationMode = 'image';
+        }
     }
 
     setupCanvas() {
@@ -1280,22 +1309,33 @@ class GamingTextGenerator {
         const file = event.target.files[0];
         if (!file) {
             this.uploadedImage = null;
+            this.gifFrames = [];
+            this.stopGifPreview();
             // ファイルが選択されていない場合は、テキストモードに戻る
             this.modeText.checked = true;
             this.handleModeChange();
             return;
         }
 
+        // GIFファイルかどうかをチェック
+        const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
+        
         const reader = new FileReader();
         reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                this.uploadedImage = img;
-                // 画像がアップロードされたら自動的に画像モードに切り替え
-                this.modeImage.checked = true;
-                this.handleModeChange();
-            };
-            img.src = e.target.result;
+            if (isGif) {
+                    this.setupGifPreview(e.target.result, file);
+            } else {
+                const img = new Image();
+                img.onload = () => {
+                    this.uploadedImage = img;
+                    this.gifFrames = [];
+                    this.stopGifPreview();
+                    // 画像がアップロードされたら自動的に画像モードに切り替え
+                    this.modeImage.checked = true;
+                    this.handleModeChange();
+                };
+                img.src = e.target.result;
+            }
         };
         reader.readAsDataURL(file);
     }
@@ -1309,6 +1349,7 @@ class GamingTextGenerator {
     }
 
     autoGeneratePreview() {
+        // 全てのモードで統一されたアニメーション処理を使用
         if (this.textAnimationMode.value === 'rainbow') {
             this.startAnimation();
         } else if (this.textAnimationMode.value === 'bluepurplepink') {
@@ -1324,6 +1365,229 @@ class GamingTextGenerator {
         }
     }
 
+    // GIFプレビューのセットアップ（改善版）
+    async setupGifPreview(dataUrl, file) {
+        
+        try {
+            // まず通常のImage要素として読み込み
+            const gifImg = new Image();
+            await new Promise((resolve, reject) => {
+                gifImg.onload = resolve;
+                gifImg.onerror = reject;
+                gifImg.src = dataUrl;
+            });
+            
+            
+            // シンプルなGIF情報検出（詳細分解はサーバーサイドで実行）
+            let frameCount = 1;
+            try {
+                // 基本的なGIF情報のみをチェック
+                frameCount = await this.getGifFrameCount(file);
+            } catch (error) {
+                frameCount = 1;
+            }
+            
+            // 常に元画像を使用（詳細分解はサーバーサイドで実行）
+            this.gifFrames = [{
+                img: gifImg,
+                originalFile: file,
+                dataUrl: dataUrl,
+                frameIndex: 0,
+                estimatedFrameCount: frameCount
+            }];
+            
+            if (frameCount > 1) {
+            } else {
+            }
+            
+            this.uploadedImage = gifImg;
+            
+            // 画像モードに切り替え
+            this.modeImage.checked = true;
+            this.handleModeChange();
+            
+            // GIFも通常の画像と同じ処理を使用（プレビューをautoGeneratePreviewに統一）
+            this.autoGeneratePreview();
+            
+        } catch (error) {
+            alert('GIFファイルの読み込みに失敗しました。');
+        }
+    }
+
+    // GIFプレビューアニメーション開始（DOM overlay方式）
+    startGifPreview() {
+        
+        this.stopGifPreview(); // 既存のアニメーションを停止
+        
+        if (!this.gifFrames || this.gifFrames.length === 0) {
+            return;
+        }
+        
+        // DOM overlay方式でプレビューを作成
+        this.createGifDOMPreview();
+        
+        // ゲーミングオーバーレイアニメーション
+        let startTime = null;
+        const animate = (currentTime) => {
+            if (!startTime) startTime = currentTime;
+            
+            const elapsed = currentTime - startTime;
+            
+            // ゲーミング効果のプログレス
+            const progress = (elapsed * 0.001) * (parseInt(this.textAnimationSpeed.value) || 5);
+            
+            // オーバーレイキャンバスにゲーミング効果を描画
+            if (this.gifOverlayCanvas) {
+                const ctx = this.gifOverlayCanvas.getContext('2d');
+                ctx.clearRect(0, 0, this.gifOverlayCanvas.width, this.gifOverlayCanvas.height);
+                this.drawGamingOverlay(ctx, progress);
+            }
+            
+            // 次のフレームをリクエスト
+            this.gifPreviewAnimationFrame = requestAnimationFrame(animate);
+        };
+        
+        this.gifPreviewAnimationFrame = requestAnimationFrame(animate);
+    }
+
+    // GIFプレビューアニメーション停止
+    stopGifPreview() {
+        if (this.gifPreviewAnimationFrame) {
+            cancelAnimationFrame(this.gifPreviewAnimationFrame);
+            this.gifPreviewAnimationFrame = null;
+        }
+        // DOM要素をクリーンアップ
+        this.cleanupGifDOMPreview();
+    }
+
+    // DOM overlay方式でGIFプレビュー作成
+    createGifDOMPreview() {
+        
+        // 既存のDOM要素をクリーンアップ
+        this.cleanupGifDOMPreview();
+        
+        if (!this.uploadedImage) return;
+        
+        // キャンバスコンテナを取得
+        const canvasSection = this.textCanvas.parentElement;
+        
+        // プレビューコンテナを作成
+        this.gifPreviewContainer = document.createElement('div');
+        this.gifPreviewContainer.style.cssText = `
+            position: relative;
+            display: inline-block;
+            max-width: 400px;
+            max-height: 400px;
+        `;
+        
+        // GIF画像要素を作成
+        this.gifImageElement = document.createElement('img');
+        this.gifImageElement.src = this.gifFrames[0].dataUrl;
+        this.gifImageElement.style.cssText = `
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        `;
+        
+        // オーバーレイキャンバスを作成
+        this.gifOverlayCanvas = document.createElement('canvas');
+        this.gifOverlayCanvas.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            mix-blend-mode: screen;
+        `;
+        
+        // 画像ロード完了時にキャンバスサイズを調整
+        this.gifImageElement.onload = () => {
+            const rect = this.gifImageElement.getBoundingClientRect();
+            this.gifOverlayCanvas.width = this.gifImageElement.naturalWidth;
+            this.gifOverlayCanvas.height = this.gifImageElement.naturalHeight;
+            this.gifOverlayCanvas.style.width = rect.width + 'px';
+            this.gifOverlayCanvas.style.height = rect.height + 'px';
+            
+        };
+        
+        // 要素を組み立て
+        this.gifPreviewContainer.appendChild(this.gifImageElement);
+        this.gifPreviewContainer.appendChild(this.gifOverlayCanvas);
+        
+        // 既存のキャンバスを非表示にして、プレビューコンテナを表示
+        this.textCanvas.style.display = 'none';
+        canvasSection.appendChild(this.gifPreviewContainer);
+    }
+
+    // DOM要素のクリーンアップ
+    cleanupGifDOMPreview() {
+        if (this.gifPreviewContainer) {
+            this.gifPreviewContainer.remove();
+            this.gifPreviewContainer = null;
+        }
+        if (this.gifImageElement) {
+            this.gifImageElement = null;
+        }
+        if (this.gifOverlayCanvas) {
+            this.gifOverlayCanvas = null;
+        }
+        // 元のキャンバスを表示
+        this.textCanvas.style.display = 'block';
+    }
+
+    // ゲーミング効果オーバーレイ描画
+    drawGamingOverlay(ctx, progress) {
+        const width = ctx.canvas.width;
+        const height = ctx.canvas.height;
+        const animationType = this.textAnimationMode.value;
+        const saturation = parseInt(this.textSaturation.value) || 100;
+        
+        // グラデーション作成
+        const gradient = ctx.createLinearGradient(0, 0, width, 0);
+        
+        if (animationType === 'rainbow') {
+            // 虹色グラデーション
+            for (let i = 0; i <= 10; i++) {
+                const hue = ((i * 36 + progress * 36) % 360);
+                const color = `hsl(${hue}, ${saturation}%, 50%)`;
+                gradient.addColorStop(i / 10, color);
+            }
+        } else if (animationType === 'golden') {
+            // 金ピカグラデーション
+            const baseHue = 45; // 金色
+            for (let i = 0; i <= 10; i++) {
+                const hue = baseHue + Math.sin(progress + i) * 20;
+                const lightness = 50 + Math.sin(progress * 2 + i) * 20;
+                const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+                gradient.addColorStop(i / 10, color);
+            }
+        } else if (animationType === 'bluepurplepink') {
+            // 青→紫→ピンク
+            const colors = [
+                `hsl(240, ${saturation}%, 50%)`, // 青
+                `hsl(270, ${saturation}%, 50%)`, // 紫
+                `hsl(300, ${saturation}%, 50%)`, // ピンク
+            ];
+            for (let i = 0; i <= 10; i++) {
+                const colorIndex = Math.floor((i + progress) % colors.length);
+                gradient.addColorStop(i / 10, colors[colorIndex]);
+            }
+        }
+
+        // スクリーンブレンドモードでオーバーレイ
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+        
+        // 元の描画モードに戻す
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+    }
+
     handleAnimationModeChange() {
         // グラデーション方向の選択UIの表示/非表示を制御
         if (this.textAnimationMode.value === 'rainbow' || this.textAnimationMode.value === 'bluepurplepink' || this.textAnimationMode.value === 'golden') {
@@ -1335,9 +1599,15 @@ class GamingTextGenerator {
         }
         
         if (this.textAnimationMode.value === 'rainbow' || this.textAnimationMode.value === 'bluepurplepink' || this.textAnimationMode.value === 'golden' || this.textAnimationMode.value === 'pulse' || this.textAnimationMode.value === 'rainbowPulse') {
-            this.startAnimation();
+            // 画像モードかつGIFの場合はGIFプレビューを再開
+            if (this.creationMode === 'image' && this.gifFrames && this.gifFrames.length > 0) {
+                this.startGifPreview();
+            } else {
+                this.startAnimation();
+            }
         } else {
             this.stopAnimation();
+            this.stopGifPreview();
             this.generateText();
         }
     }
@@ -1415,8 +1685,13 @@ class GamingTextGenerator {
         
         // 画像またはテキストを描画
         if (this.uploadedImage) {
-            // 画像アニメーションもテキストと同じ速度計算を使用
-            this.drawGamingImage(this.uploadedImage, animationMode, timeOffset);
+            // GIFの場合は静的プレビューを表示（アニメーションプレビューは処理が重いため）
+            if (this.gifFrames && this.gifFrames.length > 0) {
+                this.drawStaticGifPreview();
+            } else {
+                // 通常の画像処理
+                this.drawGamingImage(this.uploadedImage, animationMode, timeOffset);
+            }
         } else {
             const isStretch = this.textStretch.checked;
             const centerX = this.textCanvas.width / 2;
@@ -3089,10 +3364,19 @@ class GamingTextGenerator {
     }
 
     async downloadGif() {
+        
         this.textDownloadGifBtn.textContent = '生成中...';
         this.textDownloadGifBtn.disabled = true;
         
         try {
+            // 画像モードの場合はVercel APIを使用
+            if (this.creationMode === 'image' && this.gifFrames && this.gifFrames.length > 0 && this.gifFrames[0].originalFile) {
+                await this.processGifWithVercelAPI();
+                return;
+            } else {
+            }
+            
+            // テキストモードの場合は従来の方法
             await this.captureFramesForGif();
             
             const gifOptions = {
@@ -3198,6 +3482,325 @@ class GamingTextGenerator {
             this.textDownloadGifBtn.textContent = 'GIFで保存';
             this.textDownloadGifBtn.disabled = false;
         }
+    }
+
+    // Vercel APIでGIF処理を行う
+    async processGifWithVercelAPI() {
+        const originalFile = this.gifFrames[0].originalFile;
+        
+        // 処理中は全てのボタンを無効化
+        this.setUIBlocked(true);
+        
+        
+        try {
+            // GIFファイルをBase64に変換
+            const base64Data = await this.fileToBase64(originalFile);
+            
+            // 設定を取得（全てのエフェクトパラメータを含む）
+            const settings = {
+                animationType: this.textAnimationMode.value || 'rainbow',
+                speed: parseInt(this.textAnimationSpeed.value) || 5,
+                saturation: parseInt(this.textSaturation.value) || 100,
+                concentrationLines: this.textAnimationMode.value === 'concentration',
+                canvasWidth: this.textCanvas.width,
+                canvasHeight: this.textCanvas.height,
+                // グラデーション関連設定を追加
+                gradientDirection: this.textGradientDirection ? this.textGradientDirection.value : 'horizontal',
+                gradientDensity: this.textGradientDensity ? parseFloat(this.textGradientDensity.value) : 7.0,
+                // 背景設定
+                transparentBg: this.textBgTransparent ? this.textBgTransparent.checked : false,
+                backgroundColor: this.textBgColor ? this.textBgColor.value : '#000000'
+            };
+            
+            
+            this.textDownloadGifBtn.textContent = 'サーバー処理中...';
+            
+            // Vercel APIを呼び出し（相対パスを使用してCORSを回避）
+            const response = await fetch('/api/gif-gaming.py', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gifData: base64Data,
+                    settings: settings
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status} ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                const apiError = new Error(result.error || 'API処理に失敗しました');
+                apiError.serverData = result;  // サーバーからの詳細情報を保持
+                throw apiError;
+            }
+            
+            
+            // レスポンス内容をデバッグ出力
+            console.log('API Response:', result);
+            console.log('Response keys:', Object.keys(result));
+            console.log('gifData type:', typeof result.gifData);
+            console.log('gifData length:', result.gifData ? result.gifData.length : 'undefined');
+            
+            // gifDataが存在しない場合はエラーとして処理
+            if (!result.gifData) {
+                const error = new Error('API response does not contain gifData');
+                error.serverData = result;
+                throw error;
+            }
+            
+            // 結果をダウンロード
+            const blob = this.base64ToBlob(result.gifData);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'gaming_gif_' + new Date().getTime() + '.gif';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            this.textDownloadGifBtn.textContent = 'GIFで保存';
+            this.textDownloadGifBtn.disabled = false;
+            
+            // UIブロックを解除
+            this.setUIBlocked(false);
+            
+            // 成功通知を表示
+            alert('GIFの処理が完了し、ダウンロードされました！');
+            
+        } catch (error) {
+            
+            // 詳細なエラー情報を表示
+            let errorMessage = `GIF処理に失敗しました。\nエラー: ${error.message}`;
+            
+            // サーバーからの詳細エラー情報を取得
+            if (error.serverData) {
+                errorMessage += `\n\n詳細:\nタイプ: ${error.serverData.error_type || '不明'}\n内容: ${error.serverData.details || 'なし'}`;
+                if (error.serverData.traceback && error.serverData.traceback.length > 0) {
+                    errorMessage += `\nトレースバック: ${error.serverData.traceback.join(' → ')}`;
+                }
+            }
+            
+            alert(errorMessage);
+            this.textDownloadGifBtn.textContent = 'GIFで保存';
+            this.textDownloadGifBtn.disabled = false;
+            
+            // UIブロックを解除
+            this.setUIBlocked(false);
+        }
+    }
+    
+    // アニメーションGIF用静的プレビュー（最初のフレームのみ表示）
+    drawStaticGifPreview() {
+        // キャンバスをクリア
+        this.textCtx.clearRect(0, 0, this.textCanvas.width, this.textCanvas.height);
+        
+        // 背景処理
+        if (this.textBgTransparent && this.textBgTransparent.checked) {
+            // 透明背景の場合は何もしない
+        } else {
+            // 背景色を設定
+            this.textCtx.fillStyle = this.textBgColor ? this.textBgColor.value : '#000000';
+            this.textCtx.fillRect(0, 0, this.textCanvas.width, this.textCanvas.height);
+        }
+        
+        // 静的画像として描画（アニメーション効果なし）
+        this.textCtx.save();
+        
+        // キャンバスのアスペクト比に合わせて画像をフィットさせる
+        const canvasAspect = this.textCanvas.width / this.textCanvas.height;
+        const imageAspect = this.uploadedImage.width / this.uploadedImage.height;
+        
+        let drawWidth, drawHeight, drawX, drawY;
+        
+        if (canvasAspect > imageAspect) {
+            // キャンバスが横長の場合
+            drawHeight = this.textCanvas.height;
+            drawWidth = drawHeight * imageAspect;
+            drawX = (this.textCanvas.width - drawWidth) / 2;
+            drawY = 0;
+        } else {
+            // キャンバスが縦長の場合
+            drawWidth = this.textCanvas.width;
+            drawHeight = drawWidth / imageAspect;
+            drawX = 0;
+            drawY = (this.textCanvas.height - drawHeight) / 2;
+        }
+        
+        // GIF画像を静的に描画
+        this.textCtx.drawImage(this.uploadedImage, drawX, drawY, drawWidth, drawHeight);
+        
+        // プレビュー用メッセージを表示
+        this.textCtx.font = '16px sans-serif';
+        this.textCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        this.textCtx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+        this.textCtx.lineWidth = 2;
+        const message = 'アニメーションGIF - プレビューは静止画表示';
+        const textWidth = this.textCtx.measureText(message).width;
+        const textX = (this.textCanvas.width - textWidth) / 2;
+        const textY = 30;
+        
+        this.textCtx.strokeText(message, textX, textY);
+        this.textCtx.fillText(message, textX, textY);
+        
+        this.textCtx.restore();
+    }
+    
+    // UIブロック機能（全体のボタンとUIコントロールを無効化/有効化）
+    setUIBlocked(blocked) {
+        // ゲーミングテキスト生成のボタン類
+        if (this.textDownloadBtn) this.textDownloadBtn.disabled = blocked;
+        if (this.textDownloadGifBtn) this.textDownloadGifBtn.disabled = blocked;
+        if (this.textImageInput) this.textImageInput.disabled = blocked;
+        if (this.textInput) this.textInput.disabled = blocked;
+        if (this.textAnimationMode) this.textAnimationMode.disabled = blocked;
+        if (this.textAnimationSpeed) this.textAnimationSpeed.disabled = blocked;
+        if (this.textSaturation) this.textSaturation.disabled = blocked;
+        
+        // 集中線生成のボタン類（存在する場合）
+        if (window.concentrationLineGenerator) {
+            const clg = window.concentrationLineGenerator;
+            if (clg.downloadBtn) clg.downloadBtn.disabled = blocked;
+            if (clg.downloadGifBtn) clg.downloadGifBtn.disabled = blocked;
+            if (clg.downloadRealGifBtn) clg.downloadRealGifBtn.disabled = blocked;
+            if (clg.imageInput) clg.imageInput.disabled = blocked;
+        }
+        
+        // タブ切り替えも無効化
+        const tabs = document.querySelectorAll('.tab-button');
+        tabs.forEach(tab => {
+            tab.disabled = blocked;
+            if (blocked) {
+                tab.style.opacity = '0.5';
+                tab.style.pointerEvents = 'none';
+            } else {
+                tab.style.opacity = '1';
+                tab.style.pointerEvents = 'auto';
+            }
+        });
+        
+        // 処理中表示
+        if (blocked) {
+            document.body.style.cursor = 'wait';
+        } else {
+            document.body.style.cursor = 'default';
+        }
+    }
+    
+    
+    // ファイルをBase64に変換
+    fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+    
+    // Base64をBlobに変換
+    base64ToBlob(base64Data) {
+        // base64Dataの安全性チェック
+        if (!base64Data || typeof base64Data !== 'string') {
+            throw new Error('Invalid base64 data provided');
+        }
+        
+        // Data URLの場合はカンマで分割、そうでなければそのまま使用
+        const base64String = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+        const byteCharacters = atob(base64String);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        return new Blob([byteArray], {type: 'image/gif'});
+    }
+    
+    // シンプルなGIFフレーム数検出
+    async getGifFrameCount(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const buffer = e.target.result;
+                    const frameCount = this.countGifFrames(buffer);
+                    resolve(frameCount);
+                } catch (error) {
+                    resolve(1); // エラー時は1フレームとして処理
+                }
+            };
+            reader.onerror = () => resolve(1);
+            reader.readAsArrayBuffer(file);
+        });
+    }
+    
+    // GIFフレーム数をカウント（軽量版）
+    countGifFrames(buffer) {
+        const view = new DataView(buffer);
+        const uint8View = new Uint8Array(buffer);
+        
+        // GIFヘッダー確認
+        const header = String.fromCharCode(...new Uint8Array(buffer, 0, 6));
+        if (!header.startsWith('GIF')) {
+            return 1; // GIFでない場合は1フレーム
+        }
+        
+        
+        // 論理画面記述子をスキップ
+        let pos = 13;
+        
+        // グローバルカラーテーブルをスキップ
+        const globalColorTableFlag = (view.getUint8(10) & 0x80) !== 0;
+        if (globalColorTableFlag) {
+            const globalColorTableSize = 2 << (view.getUint8(10) & 0x07);
+            pos += globalColorTableSize * 3;
+        }
+        
+        let frameCount = 0;
+        const maxCheck = Math.min(buffer.byteLength, 10000); // 最初の10KBのみチェック
+        
+        while (pos < maxCheck - 1) {
+            const separator = uint8View[pos];
+            
+            if (separator === 0x2C) { // Image Descriptor (フレーム)
+                frameCount++;
+                
+                // フレーム位置をスキップ（8バイト）
+                pos += 9;
+                
+                // 簡易的にLZWデータをスキップ
+                const lzwMinimumCodeSize = uint8View[pos];
+                pos++;
+                
+                // データブロックをスキップ
+                while (pos < maxCheck) {
+                    const blockSize = uint8View[pos];
+                    pos++;
+                    if (blockSize === 0) break;
+                    pos += blockSize;
+                }
+            } else if (separator === 0x21) { // Extension
+                pos += 2;
+                // Extension data blocks をスキップ
+                while (pos < maxCheck) {
+                    const blockSize = uint8View[pos];
+                    pos++;
+                    if (blockSize === 0) break;
+                    pos += blockSize;
+                }
+            } else if (separator === 0x3B) { // Trailer
+                break;
+            } else {
+                pos++;
+            }
+        }
+        
+        return Math.max(1, frameCount); // 最低1フレーム
     }
 
     // 完璧なループのための最適フレーム数を自動計算（テキスト用）
@@ -3370,6 +3973,163 @@ class GamingTextGenerator {
             this.startAnimation();
         }
     }
+
+    drawGamingGifPreview(animationMode, timeOffset, currentTime) {
+        // キャンバスをクリア
+        this.textCtx.clearRect(0, 0, this.textCanvas.width, this.textCanvas.height);
+        
+        // GIFのフレーム数取得（推定）
+        const estimatedFrameCount = this.gifFrames[0]?.estimatedFrameCount || 10;
+        
+        // フレーム同期: GIFアニメーションのフレーム数に合わせてゲーミング効果を同期
+        const frameSync = currentTime ? (currentTime / 100) % estimatedFrameCount : 0;
+        const frameSyncProgress = frameSync / estimatedFrameCount;
+        
+        // 元のGIF画像を描画（アニメーション効果）
+        this.textCtx.save();
+        
+        // キャンバスのアスペクト比に合わせて画像をフィットさせる
+        const canvasAspect = this.textCanvas.width / this.textCanvas.height;
+        const imageAspect = this.uploadedImage.width / this.uploadedImage.height;
+        
+        let drawWidth, drawHeight, drawX, drawY;
+        
+        if (canvasAspect > imageAspect) {
+            // キャンバスが横長の場合
+            drawHeight = this.textCanvas.height;
+            drawWidth = drawHeight * imageAspect;
+            drawX = (this.textCanvas.width - drawWidth) / 2;
+            drawY = 0;
+        } else {
+            // キャンバスが縦長の場合
+            drawWidth = this.textCanvas.width;
+            drawHeight = drawWidth / imageAspect;
+            drawX = 0;
+            drawY = (this.textCanvas.height - drawHeight) / 2;
+        }
+        
+        // 背景を透明にする場合の背景色設定
+        if (this.textBgTransparent && this.textBgTransparent.checked) {
+            // 透明背景の場合は何もしない
+        } else {
+            // 背景色を設定
+            this.textCtx.fillStyle = this.textBgColor ? this.textBgColor.value : '#000000';
+            this.textCtx.fillRect(0, 0, this.textCanvas.width, this.textCanvas.height);
+        }
+        
+        // GIF画像を描画
+        this.textCtx.drawImage(this.uploadedImage, drawX, drawY, drawWidth, drawHeight);
+        
+        // ゲーミング効果をオーバーレイとして適用（フレーム同期）
+        this.applyGamingOverlayToCanvas(animationMode, timeOffset, frameSyncProgress);
+        
+        this.textCtx.restore();
+    }
+
+    applyGamingOverlayToCanvas(animationMode, timeOffset, frameSyncProgress = 0) {
+        const width = this.textCanvas.width;
+        const height = this.textCanvas.height;
+        
+        // フレーム同期されたアニメーション進行度
+        const progress = frameSyncProgress > 0 ? frameSyncProgress * 10 : (timeOffset || 0);
+        
+        // エフェクト別の描画
+        this.textCtx.save();
+        this.textCtx.globalCompositeOperation = 'screen'; // スクリーンブレンドモード
+        this.textCtx.globalAlpha = 0.6; // 60%の透明度
+        
+        if (animationMode === 'rainbow') {
+            // 虹色グラデーション
+            for (let x = 0; x < width; x += 2) {
+                const hue = (x / width * 360 + progress * 36) % 360;
+                const color = this.hsvToRgb(hue, 100, 100);
+                this.textCtx.strokeStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+                this.textCtx.lineWidth = 2;
+                this.textCtx.beginPath();
+                this.textCtx.moveTo(x, 0);
+                this.textCtx.lineTo(x, height);
+                this.textCtx.stroke();
+            }
+        } else if (animationMode === 'golden') {
+            // 金ピカ効果
+            for (let x = 0; x < width; x += 2) {
+                const lightness = Math.sin(progress * 2 + x * 0.02) * 50 + 127;
+                const r = Math.min(255, lightness + 50);
+                const g = Math.min(255, lightness);
+                const b = Math.max(0, lightness - 100);
+                this.textCtx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+                this.textCtx.lineWidth = 2;
+                this.textCtx.beginPath();
+                this.textCtx.moveTo(x, 0);
+                this.textCtx.lineTo(x, height);
+                this.textCtx.stroke();
+            }
+        } else if (animationMode === 'bluepurplepink') {
+            // ピンク青グラデーション
+            for (let x = 0; x < width; x += 2) {
+                const pos = (x / width + progress * 0.1) % 1.0;
+                let r, g, b;
+                
+                if (pos < 0.33) {
+                    const t = pos / 0.33;
+                    r = 100 + t * 155;
+                    g = 150 * (1 - t);
+                    b = 255 - t * 100;
+                } else if (pos < 0.66) {
+                    const t = (pos - 0.33) / 0.33;
+                    r = 255 - t * 100;
+                    g = t * 100;
+                    b = 155 + t * 100;
+                } else {
+                    const t = (pos - 0.66) / 0.34;
+                    r = 155 - t * 55;
+                    g = 100 + t * 50;
+                    b = 255;
+                }
+                
+                this.textCtx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+                this.textCtx.lineWidth = 2;
+                this.textCtx.beginPath();
+                this.textCtx.moveTo(x, 0);
+                this.textCtx.lineTo(x, height);
+                this.textCtx.stroke();
+            }
+        }
+        // 他のエフェクト（pulse、rainbowPulse、concentration）も必要に応じて追加
+        
+        this.textCtx.restore();
+    }
+
+    hsvToRgb(h, s, v) {
+        h = h / 60;
+        s = s / 100;
+        v = v / 100;
+        
+        const c = v * s;
+        const x = c * (1 - Math.abs((h % 2) - 1));
+        const m = v - c;
+        
+        let r, g, b;
+        if (h >= 0 && h < 1) {
+            r = c; g = x; b = 0;
+        } else if (h >= 1 && h < 2) {
+            r = x; g = c; b = 0;
+        } else if (h >= 2 && h < 3) {
+            r = 0; g = c; b = x;
+        } else if (h >= 3 && h < 4) {
+            r = 0; g = x; b = c;
+        } else if (h >= 4 && h < 5) {
+            r = x; g = 0; b = c;
+        } else {
+            r = c; g = 0; b = x;
+        }
+        
+        return {
+            r: Math.round((r + m) * 255),
+            g: Math.round((g + m) * 255),
+            b: Math.round((b + m) * 255)
+        };
+    }
 }
 
 // タブ切り替え機能
@@ -3398,7 +4158,6 @@ function initializeGlobalDarkMode() {
     const body = document.body;
     
     if (!darkModeToggle) {
-        console.warn('ダークモード切り替えボタンが見つかりません');
         return;
     }
     
@@ -3488,4 +4247,79 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 初期メモリ状況を表示
     window.debugGaming.checkMemory();
-}); 
+});
+
+// API診断用関数
+async function testAPI(endpoint = 'gif-gaming', testPost = false) {
+    const statusDiv = document.getElementById('apiStatus');
+    statusDiv.innerHTML = `${endpoint} API${testPost ? ' POST' : ''}テスト中...`;
+    
+    try {
+        let response;
+        
+        if (testPost && endpoint === 'gif-gaming') {
+            // POSTテスト用のダミーデータ
+            const testData = {
+                gifData: 'R0lGODlhAQABAIAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==', // 1x1 透明GIF
+                settings: {
+                    animation_type: 'rainbow',
+                    saturation: 100
+                }
+            };
+            
+            response = await fetch('/api/gif-gaming.py', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(testData)
+            });
+        } else {
+            // GETリクエストでAPI状態を確認
+            response = await fetch(`/api/${endpoint}.py`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+        }
+        
+        if (response.ok) {
+            try {
+                const data = await response.json();
+                statusDiv.innerHTML = `
+                    <div style="color: #90EE90;">✓ ${endpoint} API動作中</div>
+                    <div>Status: ${data.status || 'unknown'}</div>
+                    <div>Message: ${data.message || 'no message'}</div>
+                    ${data.pil_available !== undefined ? `<div>PIL: ${data.pil_available ? '✓' : '✗'}</div>` : ''}
+                    ${data.python_version ? `<div>Python: ${typeof data.python_version === 'string' ? data.python_version.split(' ')[0] : String(data.python_version).split(' ')[0]}</div>` : ''}
+                    ${data.pil_error ? `<div style="color: #FFB6C1;">PIL Error: ${data.pil_error}</div>` : ''}
+                `;
+            } catch (jsonError) {
+                // JSON parsing failed, show raw response (for hello endpoint)
+                const text = await response.text();
+                statusDiv.innerHTML = `
+                    <div style="color: #90EE90;">✓ ${endpoint} 応答あり (Text)</div>
+                    <div style="font-size: 9px; max-height: 60px; overflow-y: auto; background: rgba(255,255,255,0.1); padding: 2px;">${text.substring(0, 200)}${text.length > 200 ? '...' : ''}</div>
+                `;
+            }
+        } else {
+            statusDiv.innerHTML = `
+                <div style="color: #FFB6C1;">✗ ${endpoint} API応答エラー</div>
+                <div>Status: ${response.status}</div>
+                <div>Error: ${response.statusText}</div>
+            `;
+        }
+    } catch (error) {
+        statusDiv.innerHTML = `
+            <div style="color: #FFB6C1;">✗ ${endpoint} API接続失敗</div>
+            <div>Error: ${error.message}</div>
+        `;
+    }
+}
+
+function toggleDiagnostics() {
+    const panel = document.getElementById('apiDiagnostics');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+} 
