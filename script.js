@@ -3543,6 +3543,7 @@ class GamingTextGenerator {
             // レスポンス内容をデバッグ出力
             console.log('API Response:', result);
             console.log('Response keys:', Object.keys(result));
+            console.log('Response details:', JSON.stringify(result, null, 2));
             console.log('gifData type:', typeof result.gifData);
             console.log('gifData length:', result.gifData ? result.gifData.length : 'undefined');
             
