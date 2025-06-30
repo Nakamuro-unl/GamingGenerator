@@ -1,1 +1,1 @@
-# No dependencies required for PIL-free version
+Pillow>=10.0.0
