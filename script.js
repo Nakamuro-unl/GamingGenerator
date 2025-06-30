@@ -1157,7 +1157,6 @@ class GamingTextGenerator {
         this.uploadedImage = null;
         this.textDownloadBtn = document.getElementById('textDownloadBtn');
         this.textDownloadGifBtn = document.getElementById('textDownloadGifBtn');
-        this.debugTestBtn = document.getElementById('debugTestBtn');
         
         // テーマプレビュー関連
         this.lightCanvas = document.getElementById('lightCanvas');
@@ -1226,7 +1225,6 @@ class GamingTextGenerator {
         this.textGenerateBtn.addEventListener('click', () => this.generateText());
         this.textDownloadBtn.addEventListener('click', () => this.downloadImage());
         this.textDownloadGifBtn.addEventListener('click', () => this.downloadGif());
-        this.debugTestBtn.addEventListener('click', () => this.runDebugTest());
         
         // 作成モードラジオボタンのイベントリスナー
         this.modeText.addEventListener('change', () => this.handleModeChange());
@@ -1268,7 +1266,6 @@ class GamingTextGenerator {
         } else if (this.modeImage.checked) {
             this.creationMode = 'image';
         }
-        console.log('🔄 作成モード更新:', this.creationMode);
     }
 
     setupCanvas() {
@@ -1326,10 +1323,8 @@ class GamingTextGenerator {
         const reader = new FileReader();
         reader.onload = (e) => {
             if (isGif) {
-                console.log('📂 GIFファイル検出 - 動的プレビューを作成');
-                this.setupGifPreview(e.target.result, file);
+                    this.setupGifPreview(e.target.result, file);
             } else {
-                console.log('📂 静的画像ファイル検出');
                 const img = new Image();
                 img.onload = () => {
                     this.uploadedImage = img;
@@ -1372,7 +1367,6 @@ class GamingTextGenerator {
 
     // GIFプレビューのセットアップ（改善版）
     async setupGifPreview(dataUrl, file) {
-        console.log('🎬 GIFプレビューセットアップ開始');
         
         try {
             // まず通常のImage要素として読み込み
@@ -1383,16 +1377,13 @@ class GamingTextGenerator {
                 gifImg.src = dataUrl;
             });
             
-            console.log(`📐 GIFサイズ: ${gifImg.width}x${gifImg.height}`);
             
             // シンプルなGIF情報検出（詳細分解はサーバーサイドで実行）
             let frameCount = 1;
             try {
                 // 基本的なGIF情報のみをチェック
                 frameCount = await this.getGifFrameCount(file);
-                console.log(`🎞️ GIF情報: ${frameCount}フレーム検出（推定）`);
             } catch (error) {
-                console.warn('⚠️ フレーム数検出失敗、1フレームとして処理:', error);
                 frameCount = 1;
             }
             
@@ -1406,9 +1397,7 @@ class GamingTextGenerator {
             }];
             
             if (frameCount > 1) {
-                console.log(`✅ ${frameCount}フレームのアニメーションGIFを検出（サーバー処理で詳細分解予定）`);
             } else {
-                console.log('📸 静的GIFまたは1フレームGIFとして処理');
             }
             
             this.uploadedImage = gifImg;
@@ -1421,19 +1410,16 @@ class GamingTextGenerator {
             this.autoGeneratePreview();
             
         } catch (error) {
-            console.error('❌ GIFセットアップエラー:', error);
             alert('GIFファイルの読み込みに失敗しました。');
         }
     }
 
     // GIFプレビューアニメーション開始（DOM overlay方式）
     startGifPreview() {
-        console.log('▶️ GIFプレビューアニメーション開始（DOM overlay方式）');
         
         this.stopGifPreview(); // 既存のアニメーションを停止
         
         if (!this.gifFrames || this.gifFrames.length === 0) {
-            console.log('⚠️ GIFフレームが見つかりません');
             return;
         }
         
@@ -1469,7 +1455,6 @@ class GamingTextGenerator {
         if (this.gifPreviewAnimationFrame) {
             cancelAnimationFrame(this.gifPreviewAnimationFrame);
             this.gifPreviewAnimationFrame = null;
-            console.log('⏹️ GIFプレビューアニメーション停止');
         }
         // DOM要素をクリーンアップ
         this.cleanupGifDOMPreview();
@@ -1477,7 +1462,6 @@ class GamingTextGenerator {
 
     // DOM overlay方式でGIFプレビュー作成
     createGifDOMPreview() {
-        console.log('🏗️ DOM overlay方式でプレビュー作成');
         
         // 既存のDOM要素をクリーンアップ
         this.cleanupGifDOMPreview();
@@ -1527,8 +1511,6 @@ class GamingTextGenerator {
             this.gifOverlayCanvas.style.width = rect.width + 'px';
             this.gifOverlayCanvas.style.height = rect.height + 'px';
             
-            console.log(`🖼️ GIFサイズ: ${this.gifImageElement.naturalWidth}x${this.gifImageElement.naturalHeight}`);
-            console.log(`📐 表示サイズ: ${rect.width}x${rect.height}`);
         };
         
         // 要素を組み立て
@@ -3382,10 +3364,6 @@ class GamingTextGenerator {
     }
 
     async downloadGif() {
-        console.log('🚀 downloadGif開始');
-        console.log('🔍 creationMode:', this.creationMode);
-        console.log('🔍 gifFrames:', this.gifFrames ? this.gifFrames.length : 'null');
-        console.log('🔍 originalFile:', this.gifFrames && this.gifFrames[0] ? !!this.gifFrames[0].originalFile : 'false');
         
         this.textDownloadGifBtn.textContent = '生成中...';
         this.textDownloadGifBtn.disabled = true;
@@ -3393,11 +3371,9 @@ class GamingTextGenerator {
         try {
             // 画像モードの場合はVercel APIを使用
             if (this.creationMode === 'image' && this.gifFrames && this.gifFrames.length > 0 && this.gifFrames[0].originalFile) {
-                console.log('🌐 Vercel API でGIF処理を開始...');
                 await this.processGifWithVercelAPI();
                 return;
             } else {
-                console.log('⚠️ 条件不一致 - 通常のテキストモード処理に移行');
             }
             
             // テキストモードの場合は従来の方法
@@ -3515,8 +3491,6 @@ class GamingTextGenerator {
         // 処理中は全てのボタンを無効化
         this.setUIBlocked(true);
         
-        // まずテストAPIで接続確認
-        await this.testVercelConnection();
         
         try {
             // GIFファイルをBase64に変換
@@ -3538,54 +3512,23 @@ class GamingTextGenerator {
                 backgroundColor: this.textBgColor ? this.textBgColor.value : '#000000'
             };
             
-            console.log('📊 GIF処理設定:', settings);
             
             this.textDownloadGifBtn.textContent = 'サーバー処理中...';
             
-            // Vercel APIを呼び出し
-            // 現在のドメインを優先してAPIを呼び出し（CORS回避）
-            const currentDomain = window.location.origin;
-            const apiUrls = [
-                currentDomain, // 現在のドメイン（CORS回避）
-                'https://gaming-generator-qjlika608-nakamuros-projects-f99bfc51.vercel.app', // 最新
-                'https://gaming-generator-kdcyoa64v-nakamuros-projects-f99bfc51.vercel.app', // 以前
-                'https://gaming-generator.vercel.app' // カスタムドメイン候補
-            ];
+            // Vercel APIを呼び出し（相対パスを使用してCORSを回避）
+            const response = await fetch('/api/gif-gaming.py', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gifData: base64Data,
+                    settings: settings
+                })
+            });
             
-            console.log('🌐 現在のドメイン:', currentDomain);
-            
-            let response = null;
-            let lastError = null;
-            
-            for (const apiUrl of apiUrls) {
-                try {
-                    console.log(`🌐 API試行: ${apiUrl}`);
-                    response = await fetch(`${apiUrl}/api/gif-gaming.py`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            gifData: base64Data,
-                            settings: settings
-                        })
-                    });
-                    
-                    if (response.ok) {
-                        console.log(`✅ ${apiUrl} で接続成功`);
-                        break; // 成功したのでループを抜ける
-                    } else {
-                        throw new Error(`API Error: ${response.status} ${response.statusText}`);
-                    }
-                } catch (error) {
-                    console.warn(`⚠️ ${apiUrl} 接続失敗:`, error.message);
-                    lastError = error;
-                    response = null;
-                }
-            }
-            
-            if (!response || !response.ok) {
-                throw lastError || new Error('すべてのAPIエンドポイントで接続に失敗しました');
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status} ${response.statusText}`);
             }
             
             const result = await response.json();
@@ -3596,7 +3539,20 @@ class GamingTextGenerator {
                 throw apiError;
             }
             
-            console.log(`✅ GIF処理完了: ${result.frameCount}フレーム, サイズ: ${result.size}bytes`);
+            
+            // レスポンス内容をデバッグ出力
+            console.log('API Response:', result);
+            console.log('Response keys:', Object.keys(result));
+            console.log('Response details:', JSON.stringify(result, null, 2));
+            console.log('gifData type:', typeof result.gifData);
+            console.log('gifData length:', result.gifData ? result.gifData.length : 'undefined');
+            
+            // gifDataが存在しない場合はエラーとして処理
+            if (!result.gifData) {
+                const error = new Error('API response does not contain gifData');
+                error.serverData = result;
+                throw error;
+            }
             
             // 結果をダウンロード
             const blob = this.base64ToBlob(result.gifData);
@@ -3619,7 +3575,6 @@ class GamingTextGenerator {
             alert('GIFの処理が完了し、ダウンロードされました！');
             
         } catch (error) {
-            console.error('❌ Vercel API エラー:', error);
             
             // 詳細なエラー情報を表示
             let errorMessage = `GIF処理に失敗しました。\nエラー: ${error.message}`;
@@ -3630,7 +3585,6 @@ class GamingTextGenerator {
                 if (error.serverData.traceback && error.serverData.traceback.length > 0) {
                     errorMessage += `\nトレースバック: ${error.serverData.traceback.join(' → ')}`;
                 }
-                console.error('🔍 サーバーエラー詳細:', error.serverData);
             }
             
             alert(errorMessage);
@@ -3739,100 +3693,6 @@ class GamingTextGenerator {
         }
     }
     
-    // デバッグテスト実行
-    async runDebugTest() {
-        console.log('🧪🧪🧪 === デバッグテスト開始 === 🧪🧪🧪');
-        console.log('📍 現在の状態確認:');
-        console.log('  - creationMode:', this.creationMode);
-        console.log('  - gifFrames:', this.gifFrames);
-        console.log('  - uploadedImage:', this.uploadedImage);
-        console.log('  - textImageInput files:', this.textImageInput.files.length);
-        
-        // 基本的なAPI接続テスト
-        await this.testVercelConnection();
-        
-        // GIFファイルがある場合の詳細テスト
-        if (this.gifFrames && this.gifFrames.length > 0) {
-            console.log('🎬 GIFファイル詳細:');
-            console.log('  - フレーム数:', this.gifFrames.length);
-            console.log('  - originalFile:', !!this.gifFrames[0].originalFile);
-            console.log('  - ファイルサイズ:', this.gifFrames[0].originalFile ? this.gifFrames[0].originalFile.size : 'なし');
-            console.log('  - ファイル名:', this.gifFrames[0].originalFile ? this.gifFrames[0].originalFile.name : 'なし');
-            
-            // Vercel API呼び出しテスト
-            if (this.gifFrames[0].originalFile) {
-                console.log('🌐 Vercel GIF API呼び出しテスト開始...');
-                try {
-                    await this.processGifWithVercelAPI();
-                } catch (error) {
-                    console.error('❌ Vercel GIF APIテスト失敗:', error);
-                }
-            }
-        } else {
-            console.log('⚠️ GIFファイルがアップロードされていません');
-            alert('デバッグテストを実行するには、まずGIFファイルをアップロードしてください。');
-        }
-        
-        console.log('🧪🧪🧪 === デバッグテスト完了 === 🧪🧪🧪');
-    }
-    
-    // Vercel接続テスト
-    async testVercelConnection() {
-        try {
-            console.log('🧪 Vercel接続テスト開始');
-            // 現在のドメインを優先してAPIを呼び出し（CORS回避）
-            const currentDomain = window.location.origin;
-            const apiUrls = [
-                currentDomain, // 現在のドメイン（CORS回避）
-                'https://gaming-generator-qjlika608-nakamuros-projects-f99bfc51.vercel.app', // 最新
-                'https://gaming-generator-kdcyoa64v-nakamuros-projects-f99bfc51.vercel.app', // 以前
-                'https://gaming-generator.vercel.app' // カスタムドメイン候補
-            ];
-            
-            console.log('🌐 現在のドメイン:', currentDomain);
-            
-            let response = null;
-            let lastError = null;
-            
-            for (const apiUrl of apiUrls) {
-                try {
-                    console.log(`🧪 テストAPI試行: ${apiUrl}`);
-                    response = await fetch(`${apiUrl}/api/test`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            test: 'connection',
-                            timestamp: new Date().toISOString()
-                        })
-                    });
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        console.log('🧪 テストAPI結果:', result);
-                        
-                        if (result.success) {
-                            console.log(`✅ ${apiUrl} で接続成功`);
-                            return; // 成功したので終了
-                        } else {
-                            console.warn('⚠️ Vercel接続に問題あり:', result);
-                        }
-                    } else {
-                        throw new Error(`${response.status} ${response.statusText}`);
-                    }
-                } catch (error) {
-                    console.warn(`⚠️ ${apiUrl} テスト失敗:`, error.message);
-                    lastError = error;
-                }
-            }
-            
-            // すべて失敗した場合
-            console.error('❌ すべてのAPIエンドポイントで接続テスト失敗:', lastError);
-        } catch (error) {
-            console.error('❌ Vercel接続テスト失敗:', error);
-        }
-    }
     
     // ファイルをBase64に変換
     fileToBase64(file) {
@@ -3846,7 +3706,14 @@ class GamingTextGenerator {
     
     // Base64をBlobに変換
     base64ToBlob(base64Data) {
-        const byteCharacters = atob(base64Data.split(',')[1]);
+        // base64Dataの安全性チェック
+        if (!base64Data || typeof base64Data !== 'string') {
+            throw new Error('Invalid base64 data provided');
+        }
+        
+        // Data URLの場合はカンマで分割、そうでなければそのまま使用
+        const base64String = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+        const byteCharacters = atob(base64String);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
             byteNumbers[i] = byteCharacters.charCodeAt(i);
@@ -3865,7 +3732,6 @@ class GamingTextGenerator {
                     const frameCount = this.countGifFrames(buffer);
                     resolve(frameCount);
                 } catch (error) {
-                    console.error('❌ フレーム数検出エラー:', error);
                     resolve(1); // エラー時は1フレームとして処理
                 }
             };
@@ -3885,7 +3751,6 @@ class GamingTextGenerator {
             return 1; // GIFでない場合は1フレーム
         }
         
-        console.log(`📋 GIFヘッダー: ${header}`);
         
         // 論理画面記述子をスキップ
         let pos = 13;
@@ -3905,7 +3770,6 @@ class GamingTextGenerator {
             
             if (separator === 0x2C) { // Image Descriptor (フレーム)
                 frameCount++;
-                console.log(`🖼️ フレーム ${frameCount} 発見`);
                 
                 // フレーム位置をスキップ（8バイト）
                 pos += 9;
@@ -4295,7 +4159,6 @@ function initializeGlobalDarkMode() {
     const body = document.body;
     
     if (!darkModeToggle) {
-        console.warn('ダークモード切り替えボタンが見つかりません');
         return;
     }
     
@@ -4385,4 +4248,79 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 初期メモリ状況を表示
     window.debugGaming.checkMemory();
-}); 
+});
+
+// API診断用関数
+async function testAPI(endpoint = 'gif-gaming', testPost = false) {
+    const statusDiv = document.getElementById('apiStatus');
+    statusDiv.innerHTML = `${endpoint} API${testPost ? ' POST' : ''}テスト中...`;
+    
+    try {
+        let response;
+        
+        if (testPost && endpoint === 'gif-gaming') {
+            // POSTテスト用のダミーデータ
+            const testData = {
+                gifData: 'R0lGODlhAQABAIAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==', // 1x1 透明GIF
+                settings: {
+                    animation_type: 'rainbow',
+                    saturation: 100
+                }
+            };
+            
+            response = await fetch('/api/gif-gaming.py', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(testData)
+            });
+        } else {
+            // GETリクエストでAPI状態を確認
+            response = await fetch(`/api/${endpoint}.py`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+        }
+        
+        if (response.ok) {
+            try {
+                const data = await response.json();
+                statusDiv.innerHTML = `
+                    <div style="color: #90EE90;">✓ ${endpoint} API動作中</div>
+                    <div>Status: ${data.status || 'unknown'}</div>
+                    <div>Message: ${data.message || 'no message'}</div>
+                    ${data.pil_available !== undefined ? `<div>PIL: ${data.pil_available ? '✓' : '✗'}</div>` : ''}
+                    ${data.python_version ? `<div>Python: ${typeof data.python_version === 'string' ? data.python_version.split(' ')[0] : String(data.python_version).split(' ')[0]}</div>` : ''}
+                    ${data.pil_error ? `<div style="color: #FFB6C1;">PIL Error: ${data.pil_error}</div>` : ''}
+                `;
+            } catch (jsonError) {
+                // JSON parsing failed, show raw response (for hello endpoint)
+                const text = await response.text();
+                statusDiv.innerHTML = `
+                    <div style="color: #90EE90;">✓ ${endpoint} 応答あり (Text)</div>
+                    <div style="font-size: 9px; max-height: 60px; overflow-y: auto; background: rgba(255,255,255,0.1); padding: 2px;">${text.substring(0, 200)}${text.length > 200 ? '...' : ''}</div>
+                `;
+            }
+        } else {
+            statusDiv.innerHTML = `
+                <div style="color: #FFB6C1;">✗ ${endpoint} API応答エラー</div>
+                <div>Status: ${response.status}</div>
+                <div>Error: ${response.statusText}</div>
+            `;
+        }
+    } catch (error) {
+        statusDiv.innerHTML = `
+            <div style="color: #FFB6C1;">✗ ${endpoint} API接続失敗</div>
+            <div>Error: ${error.message}</div>
+        `;
+    }
+}
+
+function toggleDiagnostics() {
+    const panel = document.getElementById('apiDiagnostics');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+} 
